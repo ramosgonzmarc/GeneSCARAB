@@ -814,8 +814,7 @@ create_gene_list_go <- function(go_vector, org.package, go_column, id_column)
   go_offspring_comp <- mapply(function(x, y) c(x,y), go_offspring_clean, names(go_offspring_clean))
   
   # Direct subset
-  go_column <- "GO"
-  go.list <- lapply(go_offspring_comp, function(x) subset(functional_data, functional_data[[go_column]] %in% x)[["GID"]])
+  go.list <- lapply(go_offspring_comp, function(x) subset(functional_data, functional_data[[go_column]] %in% x)[[id_column]])
   go.list <- lapply(go.list, unique)
   
   return(go.list)
@@ -1182,6 +1181,123 @@ test_two_dist <- function(phase.list.1, phase.list.2)
   
   return(p_values_diff_table)
 }
+
+
+##### KEGG ######
+
+library(circular)
+library(data.table)
+library(org.Mpolymorpha.eg.db)
+source("PSEA_functions_package.R")
+
+ko_vector <- c("K10532", "K00454", "K07203", "K07203")
+circa_table <- read.table("circacompare_intersection.tsv", header = T, sep = "\t")
+total_phases_table <- data.frame(names=rownames(circa_table), phase=as.numeric(circa_table[["ld.peak.time"]]))
+functional_data <- select(org.Mpolymorpha.eg.db, 
+                          keys = keys(org.Mpolymorpha.eg.db,keytype="GID"), 
+                          columns =  c("GID", "KO"))
+
+vemosaver <- sapply(ko_vector, function(x) keggLink("pathway", x))
+bbbb <- unique(unlist(vemosaver))
+rutas_completo <- bbbb[grep("map", bbbb)]
+rutas_lista <- sapply(strsplit(rutas_completo, ":"), function(x) x[[2]])
+
+keggLink("ko", "map04150")
+
+rutas_kos <- lapply(rutas_lista, function(x) keggLink("ko",x))
+names(rutas_kos) <- rutas_lista
+rutas_kos_clean <- lapply(rutas_kos, function(x) unique(x))
+rutas_kos_clean <- lapply(rutas_kos_clean, function(x) sapply(strsplit(x, ":"), function(y) y[[2]]))
+ko.list <- lapply(rutas_kos_clean, function(x) subset(functional_data, functional_data[["KO"]] %in% x)[["GID"]])
+ko.list <- lapply(ko.list, unique)
+
+
+
+library(clusterProfiler)
+kos_enrich <- enrichKEGG(gene         = functional_data$KO,
+                         organism     = 'ko',
+                         pvalueCutoff = 1)
+hola <- as.data.frame(kos_enrich)
+
+hola$geneID[100]
+hola$geneID[1]
+
+
+
+keggFind("pathway", "map00770")
+
+todas_las_rutas <- keggList("pathway", "ko")
+listDatabases()
+
+keggList("ko")
+keggLink("pathway", "K01522")
+
+hola_base <- keggList("pathway", "K01522")
+
+hola_base["ko01522"]
+keggFind("ko", "K01522")
+
+
+
+keggFind("genes", c("shiga", "toxin"))
+listDatabases()
+
+library(KEGGREST)
+
+
+
+
+
+
+create_gene_list_kegg <- function(ko_vector, org.package, ko_column, id_column)
+{
+  functional_data <- select(get(org.package), 
+                            keys = keys(get(org.package),keytype=id_column), 
+                            columns =  c(id_column, ko_column))
+  
+  # Get pathways for selected KOs 
+  
+  
+  
+  l <- list(bp_ancestors, mf_ancestors, cc_ancestors)
+  l_keys <- unique(unlist(lapply(l, names)))
+  
+  go_ancestors <- setNames(do.call(mapply, c(FUN=c, lapply(l, `[`, l_keys))), l_keys)
+  go_ancestors <- lapply(go_ancestors, function(x) x[!is.na(x)])
+  go_ancestors <- lapply(go_ancestors, function(x) x[x != "all"])
+  go_vec_ancestors <- unlist(go_ancestors)
+  names(go_vec_ancestors) <- NULL
+  
+  # Add go terms in study to the ancestors list to get successors
+  query_vec_ancestors <- c(go_vec_ancestors, go_vector)
+  query_vec_ancestors <- unique(query_vec_ancestors)
+  
+  # Get succesors for the complete list of current GO terms and their ancestors
+  bp_offspring <- BiocGenerics::mget(query_vec_ancestors, GOBPOFFSPRING, ifnotfound=NA)
+  mf_offspring <- BiocGenerics::mget(query_vec_ancestors, GOMFOFFSPRING, ifnotfound=NA)
+  cc_offspring <- BiocGenerics::mget(query_vec_ancestors, GOCCOFFSPRING, ifnotfound=NA)
+  
+  # Iterate and get genes for each parental based in its offspring GO
+  l_offspring <- list(bp_offspring, mf_offspring, cc_offspring)
+  l_offspring_keys <- unique(unlist(lapply(l_offspring, names)))
+  go_offspring <- setNames(do.call(mapply, c(FUN=c, lapply(l_offspring, `[`, l_offspring_keys))), l_offspring_keys)
+  
+  go_offspring_clean <- lapply(go_offspring, function(x) x[!is.na(x)])
+  
+  # Add self to each list
+  go_offspring_comp <- mapply(function(x, y) c(x,y), go_offspring_clean, names(go_offspring_clean))
+  
+  # Direct subset
+  go_column <- "GO"
+  go.list <- lapply(go_offspring_comp, function(x) subset(functional_data, functional_data[[go_column]] %in% x)[["GID"]])
+  go.list <- lapply(go.list, unique)
+  
+  return(go.list)
+  
+}
+
+
+
 
 
 # Mirar dryR para sustituir los Venn y circacompare
