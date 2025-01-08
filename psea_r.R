@@ -903,18 +903,6 @@ test_against_gen_dist <- function(phase.list, total.phase.table)
   return(gen_dist_table)
 }
 
-manova(cbind(sin(c(gen_dist, phase.list[[1]]$phase*pi/12)),cos(c(gen_dist, phase.list[[1]]$phase*pi/12))) 
-  ~ c(rep("general", len_gen_dist), rep("specific", nrow(phase.list[[1]]))))
-
-summary(manova(cbind(sin(c(gen_dist, phase.list[[1]]$phase*pi/12)),cos(c(gen_dist, phase.list[[1]]$phase*pi/12))) 
-               ~ c(rep("general", len_gen_dist), rep("specific", nrow(phase.list[[1]])))))$stats[1,6]
-
-hola <- sum(sapply(phase.list, dim) != 2)
-
-
-
-hola[1:6]
-
 gen.dist.test <- test_against_gen_dist(phases.list.test, total_phases_table)
 
 # Two or more distributions: MANOVA
@@ -1122,13 +1110,13 @@ res.table["GO:0006414",]
 prueba_modos <- circular(phases.list.test$`GO:0006414`$phase*pi/12)
 modos_summary <- summary(prueba_modos)
 modos_ray <- rayleigh.test(prueba_modos, mu=circular(modos_summary["Mean"]))$p.value
-modos_hr <- HR_test(prueba_modos, original = F, iter = 99999)
+modos_hr <- HR_test(prueba_modos, original = F, iter = 99999) #hr identifies multimodality
 
 # Transformar en simetría de 2
 prueba_2_modos <- (phases.list.test$`GO:0006414`$phase*2) %% 24
 prueba_2_modos_radians <- circular(prueba_2_modos*pi/12)
 modos_summary_2 <- summary(prueba_2_modos_radians)
-modos_ray_2 <- rayleigh.test(prueba_2_modos_radians, mu=circular(modos_summary_2["Mean"]))$p.value
+modos_ray_2 <- rayleigh.test(prueba_2_modos_radians, mu=circular(modos_summary_2["Mean"]))$p.value # significant
 
 # Transformar en simetría de 3
 prueba_3_modos <- (phases.list.test$`GO:0006414`$phase*3) %% 24
@@ -1136,42 +1124,64 @@ prueba_3_modos_radians <- circular(prueba_3_modos*pi/12)
 modos_summary_3 <- summary(prueba_3_modos_radians)
 modos_ray_3 <- rayleigh.test(prueba_3_modos_radians, mu=circular(modos_summary_3["Mean"]))$p.value
 
-# Transformar en simetría de 4
+# Transformar en simetría de 4 (esta ya no es frecuente)
 prueba_4_modos <- (phases.list.test$`GO:0006414`$phase*4) %% 24
 prueba_4_modos_radians <- circular(prueba_4_modos*pi/12)
 modos_summary_4 <- summary(prueba_4_modos_radians)
 modos_ray_4 <- rayleigh.test(prueba_4_modos_radians, mu=circular(modos_summary_4["Mean"]))$p.value
 
-
-# Compare two different distributions
-test_against_gen_dist <- function(phase.list, total.phase.table)
+# Determine number of modes in the pressence of f-fold symmetry
+number_of_modes <- function(circa_table)
 {
-  gen_dist <- total.phase.table$phase*pi/12
-  len_gen_dist <- length(gen_dist)
+  circa_radians <- circular(circa_table$phase*pi/12)
+  modes_summary <- summary(circa_radians)
+  modes_ray <- rayleigh.test(circa_radians, mu=circular(modes_summary["Mean"]))$p.value
   
-  p_values_gen_test <- sapply(phase.list, function(x) summary(manova(cbind(sin(c(gen_dist, x$phase*pi/12)),cos(c(gen_dist, x$phase*pi/12))) 
-                                                                     ~ c(rep("general", len_gen_dist), rep("specific", nrow(x)))))$stats[1,6])
-  gen_dist_bh <- p.adjust(p_values_gen_test, method = "BH")
+  circa_radians_2 <- circular(((circa_table$phase*2) %% 24)*pi/12)
+  modes_summary_2 <- summary(circa_radians_2)
+  modes_ray_2 <- rayleigh.test(circa_radians_2, mu=circular(modes_summary_2["Mean"]))$p.value
   
-  gen_dist_table <- data.frame(gen_dist_p_value=p_values_gen_test, 
-                               gen_dist_p_value_adj=gen_dist_bh)
+  circa_radians_3 <- circular(((circa_table$phase*3) %% 24)*pi/12)
+  modes_summary_3 <- summary(circa_radians_3)
+  modes_ray_3 <- rayleigh.test(circa_radians_3, mu=circular(modes_summary_3["Mean"]))$p.value
   
-  return(gen_dist_table)
+  expected_modes <- which.min(c(modes_ray, modes_ray_2, modes_ray_3))
+  expected_p_value <- min(c(modes_ray, modes_ray_2, modes_ray_3))
+  
+  print(paste0("The most probable number of modes is ", expected_modes, 
+               ", p-value: ", expected_p_value))
+  
+  return(expected_modes)
+  
 }
 
+# This should be used in cases where HR but not Kuiper or Rayleigh reported significancy
+aaaa <- number_of_modes(phases.list.test$`GO:0006414`)
 
-
-# Calculate circular measures
-circa_summary <- summary(circa_radians) # "n", "Min.", "1st Qu.", "Median", "Mean", "3rd Qu.", "Max.", "Rho"
-
-# Calculate circular variance and transform to hours again
-circa_var <- var.circular(circa_radians)
-
-# Apply kupier's test
-circa_kupier <- kuiper(circa_radians, rads = T, R=1)$p.value
-
-# Apply Rayleigh's test
-circa_ray <- rayleigh.test(prueba_modos, mu=circular(circa_summary["Mean"]))$p.value
+# Compare two different distributions
+test_two_dist <- function(phase.list.1, phase.list.2)
+{
+  if (length(phase.list.1) != length(phase.list.2))
+  {
+    stop("Error: length of lists differ.")
+  }
+  
+  if (names(phase.list.1) != names(phase.list.2))
+  {
+    warning("The names of the sets do not match, check if they should.")
+  }
+  
+  p_values_diff_test <- mapply(function(x, y) summary(manova(cbind(sin(c(x$phase*pi/12, y$phase*pi/12)),cos(c(x$phase*pi/12, y$phase*pi/12))) 
+                                                        ~ c(rep("first", nrow(x)), rep("second", nrow(y)))))$stats[1,6],
+                               phase.list.1, phase.list.2)
+  
+  p_values_diff_bh <- p.adjust(p_values_diff_test, method = "BH")
+  
+  p_values_diff_table <- data.frame(p_value=p_values_diff_test, 
+                               p_value_adj=p_values_diff_bh)
+  
+  return(p_values_diff_table)
+}
 
 
 # Mirar dryR para sustituir los Venn y circacompare
