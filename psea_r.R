@@ -1242,12 +1242,16 @@ keggFind("ko", "K01522")
 keggFind("genes", c("shiga", "toxin"))
 listDatabases()
 
+
+
+
+
+ko_vector <- c("K10532", "K00454", "K07203", "K07203")
+org.package <- "org.Mpolymorpha.eg.db"
+ko_column <- "KO"
+id_column <- "GID"
+
 library(KEGGREST)
-
-
-
-
-
 
 create_gene_list_kegg <- function(ko_vector, org.package, ko_column, id_column)
 {
@@ -1256,49 +1260,109 @@ create_gene_list_kegg <- function(ko_vector, org.package, ko_column, id_column)
                             columns =  c(id_column, ko_column))
   
   # Get pathways for selected KOs 
+  present_pathways <- sapply(ko_vector, function(x) keggLink("pathway", x))
+  unique_pathways <- unique(unlist(present_pathways))
+  map_pathways <- unique_pathways[grep("map", unique_pathways)] # maybe change this for ko in other versions
+  list_pathways <- sapply(strsplit(map_pathways, ":"), function(x) x[[2]])
   
   
+  kos_pathways <- lapply(list_pathways, function(x) keggLink("ko",x))
+  names(kos_pathways) <- list_pathways
+  kos_pathways_clean <- lapply(kos_pathways, function(x) unique(x))
+  kos_pathways_clean <- lapply(kos_pathways_clean, function(x) sapply(strsplit(x, ":"), function(y) y[[2]]))
+  ko_list <- lapply(kos_pathways_clean, function(x) subset(functional_data, functional_data[["KO"]] %in% x)[["GID"]])
+  ko_list <- lapply(ko_list, unique)
   
-  l <- list(bp_ancestors, mf_ancestors, cc_ancestors)
-  l_keys <- unique(unlist(lapply(l, names)))
-  
-  go_ancestors <- setNames(do.call(mapply, c(FUN=c, lapply(l, `[`, l_keys))), l_keys)
-  go_ancestors <- lapply(go_ancestors, function(x) x[!is.na(x)])
-  go_ancestors <- lapply(go_ancestors, function(x) x[x != "all"])
-  go_vec_ancestors <- unlist(go_ancestors)
-  names(go_vec_ancestors) <- NULL
-  
-  # Add go terms in study to the ancestors list to get successors
-  query_vec_ancestors <- c(go_vec_ancestors, go_vector)
-  query_vec_ancestors <- unique(query_vec_ancestors)
-  
-  # Get succesors for the complete list of current GO terms and their ancestors
-  bp_offspring <- BiocGenerics::mget(query_vec_ancestors, GOBPOFFSPRING, ifnotfound=NA)
-  mf_offspring <- BiocGenerics::mget(query_vec_ancestors, GOMFOFFSPRING, ifnotfound=NA)
-  cc_offspring <- BiocGenerics::mget(query_vec_ancestors, GOCCOFFSPRING, ifnotfound=NA)
-  
-  # Iterate and get genes for each parental based in its offspring GO
-  l_offspring <- list(bp_offspring, mf_offspring, cc_offspring)
-  l_offspring_keys <- unique(unlist(lapply(l_offspring, names)))
-  go_offspring <- setNames(do.call(mapply, c(FUN=c, lapply(l_offspring, `[`, l_offspring_keys))), l_offspring_keys)
-  
-  go_offspring_clean <- lapply(go_offspring, function(x) x[!is.na(x)])
-  
-  # Add self to each list
-  go_offspring_comp <- mapply(function(x, y) c(x,y), go_offspring_clean, names(go_offspring_clean))
-  
-  # Direct subset
-  go_column <- "GO"
-  go.list <- lapply(go_offspring_comp, function(x) subset(functional_data, functional_data[[go_column]] %in% x)[["GID"]])
-  go.list <- lapply(go.list, unique)
-  
-  return(go.list)
+  return(ko_list)
   
 }
 
 
 
+# Clustering
+#install.packages("OptCirClust")
+library(OptCirClust)
 
+O = rnorm(100)
+K = 5
+Circumference = 6
+result_FOCC <- CirClust(O, K, Circumference, method = "FOCC")
+
+opar <- par(mar=c(0,0,2,0))
+
+plot(result_FOCC, main = "FOCC: fast and optimal\n***Recommended***")
+
+
+
+K <- number_of_modes(phases.list.test$`GO:0006414`)
+O <- phases.list.test$`GO:0006414`$phase
+Circumference <- 24
+result_FOCC <- CirClust(O, K, Circumference, method = "FOCC")
+
+opar <- par(mar=c(0,0,2,0))
+plot(result_FOCC, main = "Bimodal")
+
+clusters_focc <- lapply(1:max(result_FOCC$cluster), function(x) phases.list.test$`GO:0006414`[result_FOCC$cluster == x,])
+
+
+
+
+# Define mean of each mode
+result_FOCC$centers %% 24
+
+cluster1 <- phases.list.test$`GO:0006414`[result_FOCC$cluster == 1,]
+
+clusters_focc <- lapply(1:max(result_FOCC$cluster), function(x) phases.list.test$`GO:0006414`[result_FOCC$cluster == x,])
+circa_radians <- lapply(clusters_focc, function(x) circular(x$phase*pi/12))
+circa_summary <- sapply(circa_radians, function(x) summary(x))
+
+circa_table <- data.frame(n=circa_summary["n",], first=circa_summary["1st Qu.",]*12/pi, 
+                          median=circa_summary["Median",]*12/pi, mean=circa_summary["Mean",]*12/pi,
+                          third=circa_summary["3rd Qu.",]*12/pi, rho=circa_summary["Rho",])
+
+pos_res <- apply(circa_table[,2:5], MARGIN=2, function(x) ifelse(as.numeric(x) < 0, 24 + as.numeric(x) , as.numeric(x)))
+circa_table[,2:5] <- pos_res
+
+circa_table  <- phases.list.test$`GO:0006414`
+
+multimodal_analysis <- function(circa_table)
+{
+  circa_radians <- circular(circa_table$phase*pi/12)
+  modes_summary <- summary(circa_radians)
+  modes_ray <- rayleigh.test(circa_radians, mu=circular(modes_summary["Mean"]))$p.value
+  
+  circa_radians_2 <- circular(((circa_table$phase*2) %% 24)*pi/12)
+  modes_summary_2 <- summary(circa_radians_2)
+  modes_ray_2 <- rayleigh.test(circa_radians_2, mu=circular(modes_summary_2["Mean"]))$p.value
+  
+  circa_radians_3 <- circular(((circa_table$phase*3) %% 24)*pi/12)
+  modes_summary_3 <- summary(circa_radians_3)
+  modes_ray_3 <- rayleigh.test(circa_radians_3, mu=circular(modes_summary_3["Mean"]))$p.value
+  
+  expected_modes <- which.min(c(modes_ray, modes_ray_2, modes_ray_3))
+  expected_p_value <- min(c(modes_ray, modes_ray_2, modes_ray_3))
+  
+  result_FOCC <- CirClust(circa_table$phase, expected_modes, 24, method = "FOCC")
+  clusters_focc <- lapply(1:max(result_FOCC$cluster), function(x) circa_table[result_FOCC$cluster == x,])
+  names(clusters_focc) <- paste0("cluster_", 1:max(result_FOCC$cluster))
+  
+  cluster_radians <- lapply(clusters_focc, function(x) circular(x$phase*pi/12))
+  cluster_summary <- sapply(cluster_radians, function(x) summary(x))
+  
+  cluster_table <- data.frame(n=cluster_summary["n",], first=cluster_summary["1st Qu.",]*12/pi, 
+                            median=cluster_summary["Median",]*12/pi, mean=cluster_summary["Mean",]*12/pi,
+                            third=cluster_summary["3rd Qu.",]*12/pi, rho=cluster_summary["Rho",])
+  pos_cluster <- apply(cluster_table[,2:5], MARGIN=2, function(x) ifelse(as.numeric(x) < 0, 24 + as.numeric(x) , as.numeric(x)))
+  cluster_table[,2:5] <- pos_cluster
+  
+  cluster_list <- list(expected_modes = expected_modes, expected_p_value = expected_p_value,
+                       total_p_values = c(modes_ray, modes_ray_2, modes_ray_3), summary = cluster_table)
+  cluster_list_res <- append(cluster_list, clusters_focc)
+  
+  return(cluster_list_res)
+}
+
+multimodal_analysis(phases.list.test$`GO:0006414`)
 
 # Mirar dryR para sustituir los Venn y circacompare
 # Leer también Circadian transcriptome processing and analysis: a workflow for muscle stem cells
