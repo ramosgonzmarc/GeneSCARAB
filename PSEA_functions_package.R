@@ -104,40 +104,88 @@ HermansRasson2T <- function(data){
   return(T)
 }
 
-# Main function: Individual circular table creation
-# create_circular_table <- function(circa_vector, iter = 9999)
-# {
-#   
-#   circa_radians <- circular(circa_vector*pi/12)
-#   
-#   # Calculate circular measures
-#   circa_summary <- summary(circa_radians) # "n", "Min.", "1st Qu.", "Median", "Mean", "3rd Qu.", "Max.", "Rho"
-#   
-#   # Calculate circular variance and transform to hours again
-#   circa_var <- var.circular(circa_radians)
-#   
-#   # Apply kupier's test
-#   circa_kupier <- kuiper(circa_radians, rads = T, R=1)$p.value
-#   
-#   # Apply Rayleigh's test
-#   circa_ray <- rayleigh.test(circa_radians, mu=circular(circa_summary["Mean"]))$p.value
-#   
-#   # Apply HR test
-#   circa_hr <- HR_test(circa_radians, original = F, iter = iter)
-#   
-#   # Create table
-#   circa_table <- data.frame(n=circa_summary["n"], first=circa_summary["1st Qu."]*12/pi, 
-#                             median=circa_summary["Median"]*12/pi, mean=circa_summary["Mean"]*12/pi,
-#                             third=circa_summary["3rd Qu."]*12/pi, rho=circa_summary["Rho"], 
-#                             var=circa_var, kuiper_p_value=circa_kupier, rayleigh_p_value=circa_ray, 
-#                             hr_p_value = circa_hr[2] )
-#   
-#   
-#   return(circa_table)
-#   
-# }
+# Functions to create input lists for GO terms and KEGG pathways
+create_gene_list_go <- function(go_vector, org.package, go_column, id_column)
+{
+  functional_data <- select(get(org.package), 
+                            keys = keys(get(org.package),keytype=id_column), 
+                            columns =  c(id_column, go_column))
+  
+  # Get ancestors of selected GOs for BP, MF and CC 
+  bp_ancestors <- BiocGenerics::mget(go_vector, GOBPANCESTOR, ifnotfound=NA)
+  mf_ancestors <- BiocGenerics::mget(go_vector, GOMFANCESTOR, ifnotfound=NA)
+  cc_ancestors <- BiocGenerics::mget(go_vector, GOCCANCESTOR, ifnotfound=NA)
+  
+  l <- list(bp_ancestors, mf_ancestors, cc_ancestors)
+  l_keys <- unique(unlist(lapply(l, names)))
+  
+  go_ancestors <- setNames(do.call(mapply, c(FUN=c, lapply(l, `[`, l_keys))), l_keys)
+  go_ancestors <- lapply(go_ancestors, function(x) x[!is.na(x)])
+  go_ancestors <- lapply(go_ancestors, function(x) x[x != "all"])
+  go_vec_ancestors <- unlist(go_ancestors)
+  names(go_vec_ancestors) <- NULL
+  
+  # Add go terms in study to the ancestors list to get successors
+  query_vec_ancestors <- c(go_vec_ancestors, go_vector)
+  query_vec_ancestors <- unique(query_vec_ancestors)
+  
+  # Get succesors for the complete list of current GO terms and their ancestors
+  bp_offspring <- BiocGenerics::mget(query_vec_ancestors, GOBPOFFSPRING, ifnotfound=NA)
+  mf_offspring <- BiocGenerics::mget(query_vec_ancestors, GOMFOFFSPRING, ifnotfound=NA)
+  cc_offspring <- BiocGenerics::mget(query_vec_ancestors, GOCCOFFSPRING, ifnotfound=NA)
+  
+  # Iterate and get genes for each parental based in its offspring GO
+  l_offspring <- list(bp_offspring, mf_offspring, cc_offspring)
+  l_offspring_keys <- unique(unlist(lapply(l_offspring, names)))
+  go_offspring <- setNames(do.call(mapply, c(FUN=c, lapply(l_offspring, `[`, l_offspring_keys))), l_offspring_keys)
+  
+  go_offspring_clean <- lapply(go_offspring, function(x) x[!is.na(x)])
+  
+  # Add self to each list
+  go_offspring_comp <- mapply(function(x, y) c(x,y), go_offspring_clean, names(go_offspring_clean))
+  
+  # Direct subset
+  go.list <- lapply(go_offspring_comp, function(x) subset(functional_data, functional_data[[go_column]] %in% x)[[id_column]])
+  go.list <- lapply(go.list, unique)
+  
+  return(go.list)
+  
+}
 
-# Circular table complete
+create_gene_list_kegg <- function(ko_vector, org.package, ko_column, id_column)
+{
+  functional_data <- select(get(org.package), 
+                            keys = keys(get(org.package),keytype=id_column), 
+                            columns =  c(id_column, ko_column))
+  
+  # Get pathways for selected KOs 
+  present_pathways <- sapply(ko_vector, function(x) keggLink("pathway", x))
+  unique_pathways <- unique(unlist(present_pathways))
+  map_pathways <- unique_pathways[grep("map", unique_pathways)] # maybe change this for ko in other versions
+  list_pathways <- sapply(strsplit(map_pathways, ":"), function(x) x[[2]])
+  
+  
+  kos_pathways <- lapply(list_pathways, function(x) keggLink("ko",x))
+  names(kos_pathways) <- list_pathways
+  kos_pathways_clean <- lapply(kos_pathways, function(x) unique(x))
+  kos_pathways_clean <- lapply(kos_pathways_clean, function(x) sapply(strsplit(x, ":"), function(y) y[[2]]))
+  ko_list <- lapply(kos_pathways_clean, function(x) subset(functional_data, functional_data[["KO"]] %in% x)[["GID"]])
+  ko_list <- lapply(ko_list, unique)
+  
+  return(ko_list)
+  
+}
+
+# Statistics and general workflow functions
+# Function to create a phase table list from gene lists
+gene.list.to.phases <- function(gene.list, phase.table)
+{
+  circa_reduced <- lapply(gene.list, function(x) subset(phase.table, names %in% x))
+  return(circa_reduced)
+  
+}
+
+# Function to create the circular table and deviation from the uniform distribution for a single set
 create_circular_table <- function(circa_vector, hr.on.large.sets = F, hr.on.large.sets.th=400,
                                   iter = 999, force.hr=F, force.hr.th=0.05)
 {
@@ -190,44 +238,15 @@ create_circular_table <- function(circa_vector, hr.on.large.sets = F, hr.on.larg
   
 }
 
-
-# Functions for GO analysis
-# Function to generate GO terms list with ancestors
-go_list_ancestors <- function(go_vector, functional_data, go_column="GO", id_column="GID")
+# Function to create the circular table and deviation from the uniform distribution for a phases list
+complete_circular_table <- function(phase.list, hr.on.large.sets = F, hr.on.large.sets.th=400,
+                                    iter = 999, force.hr=F, force.hr.th=0.05)
 {
-  functional_data <- select(org.Mpolymorpha.eg.db, 
-                            keys = keys(org.Mpolymorpha.eg.db,keytype="GID"), 
-                            columns =  c("GID", "GO"))
-  functional_data <- select(org.Mpolymorpha.eg.db, keys = keys(org.Mpolymorpha.eg.db,keytype="GID"), columns =  c("GID", "GO"))
-  
-  go.list.first <- lapply(go_vector, 
-                          function(x) go_phase_table(go_column="GO", go_term=x, total_phases_table, id_column="GID", functional_data))
-  names(go.list.first) <- go_vector
-}
-
-# Function to create tables filtered by go
-go_phase_table <- function(go_column, go_term, total_phases_table, id_column, functional_data)
-{
-  
-  functional_reduced <- subset(functional_data, functional_data[[go_column]] == go_term)
-  circa_reduced <- subset(total_phases_table, total_phases_table$names %in% functional_reduced[[id_column]] )
-  return(circa_reduced)
-}
-
-#Function to enter a vector of GOs and compute the resulting circular statistiscs table
-gos_circular_table <- function(total_phases_table, go_vector, id_column="GID", go_column="GO", annot_package="org.Mpolymorpha.eg.db",
-                               iter=9999)
-{
-  
-  # Load annotation
-  functional_data <- select(get(annot_package), keys = keys(get(annot_package),keytype=id_column), 
-                            columns =  c(id_column, go_column))
-  
-  # Generate phases lists per GO
-  go_phases_list <- lapply(go_vector, function(x) go_phase_table(go_column, go_term = x, total_phases_table, id_column, functional_data))
   
   # Generate circular statistics table per GO
-  go_circa_res <- lapply(go_phases_list, function(x) create_circular_table(x$phase, iter=iter))
+  go_circa_res <- lapply(phase.list, function(x) create_circular_table(x$phase, hr.on.large.sets = hr.on.large.sets, 
+                                                                       hr.on.large.sets.th=hr.on.large.sets.th, iter=iter,
+                                                                       force.hr=force.hr, force.hr.th=force.hr.th))
   
   # Adjust p-values due to multiple testing
   go_circa_num <- t(sapply(go_circa_res, function(x) unlist(x[1:7])))
@@ -239,58 +258,124 @@ gos_circular_table <- function(total_phases_table, go_vector, id_column="GID", g
   rh_bh <- p.adjust(go_circa_hr, method = "BH")
   
   # Return updated table
-  go_circa_table <- data.frame(go_circa_num, kuiper_p_value=kupier_bh, rayleigh_p_value=ray_bh, hr_p_value=rh_bh)
-  rownames(go_circa_table) <- go_vector
+  go_circa_table <- data.frame(go_circa_num, kuiper_p_value=go_circa_kupier, kuiper_p_value_adj=kupier_bh, 
+                               rayleigh_p_value=go_circa_ray, rayleigh_p_value_adj=ray_bh,
+                               hr_p_value=go_circa_hr, hr_p_value_adj=rh_bh)
+  rownames(go_circa_table) <- names(phase.list)
+  
+  
+  # Transform negative means and quantiles to positive
+  pos_res <- apply(go_circa_table[,2:5], MARGIN=2, function(x) ifelse(as.numeric(x) < 0, 24 + as.numeric(x) , as.numeric(x)))
+  go_circa_table[,2:5] <- pos_res
   
   return(go_circa_table)
 }
 
-# Function to adjust resulting table to non-negative phases
-non_negative_table <- function(res_table)
+# Function to compute the deviation from the total experimental distribution for a phases list
+test_against_gen_dist <- function(phase.list, total.phase.table)
 {
-  pos_res <- apply(res_table[,2:5], MARGIN=2, function(x) ifelse(as.numeric(x) < 0, 24 + as.numeric(x) , as.numeric(x)))
-  res_table[,2:5] <- pos_res
+  gen_dist <- total.phase.table$phase*pi/12
+  len_gen_dist <- length(gen_dist)
   
-  return(res_table)
+  p_values_gen_test <- sapply(phase.list, function(x) summary(manova(cbind(sin(c(gen_dist, x$phase*pi/12)),cos(c(gen_dist, x$phase*pi/12))) 
+                                                                     ~ c(rep("general", len_gen_dist), rep("specific", nrow(x)))))$stats[1,6])
+  gen_dist_bh <- p.adjust(p_values_gen_test, method = "BH")
+  
+  gen_dist_table <- data.frame(gen_dist_p_value=p_values_gen_test, 
+                               gen_dist_p_value_adj=gen_dist_bh)
+  
+  return(gen_dist_table)
 }
 
-# Same functions using data.table for speed
-# Function to create tables filtered by go
-go_phase_table_rapid <- function(go_column, go_term, total_phases_table, id_column, functional_data)
+# Fuction for comparing the distributions of to different phase lists
+test_two_dist <- function(phase.list.1, phase.list.2)
 {
-  functional_reduced <- functional_data[get(go_column) == go_term,]
-  circa_reduced <- total_phases_table[names %in% unlist(functional_reduced[,.(get(id_column))])]
-  return(circa_reduced)
+  if (length(phase.list.1) != length(phase.list.2))
+  {
+    stop("Error: length of lists differ.")
+  }
+  
+  if (names(phase.list.1) != names(phase.list.2))
+  {
+    warning("The names of the sets do not match, check if they should.")
+  }
+  
+  p_values_diff_test <- mapply(function(x, y) summary(manova(cbind(sin(c(x$phase*pi/12, y$phase*pi/12)),cos(c(x$phase*pi/12, y$phase*pi/12))) 
+                                                             ~ c(rep("first", nrow(x)), rep("second", nrow(y)))))$stats[1,6],
+                               phase.list.1, phase.list.2)
+  
+  p_values_diff_bh <- p.adjust(p_values_diff_test, method = "BH")
+  
+  p_values_diff_table <- data.frame(p_value=p_values_diff_test, 
+                                    p_value_adj=p_values_diff_bh)
+  
+  return(p_values_diff_table)
 }
 
-#Function to enter a vector of GOs and compute the resulting circular statistiscs table
-gos_circular_table_rapid <- function(total_phases_table, go_vector, id_column="GID", go_column="GO", annot_package="org.Mpolymorpha.eg.db",
-                                     iter=9999)
+# Function to compute the contribution of each gene in a set to the temporal cohesion of the whole set
+gene_contribution_to_set <- function(circa_result, phase_list)
 {
+  new_phase_list <- phase_list[rownames(circa_result)]
+  res_lot <- list()
   
-  functional_data <- select(get(annot_package), keys = keys(get(annot_package),keytype=id_column), 
-                            columns =  c(id_column, go_column))
-  functional_data <- data.table(functional_data)
-  total_phases_table <- data.table(total_phases_table)
+  for (x in names(phase_list))
+  {
+    new_list <- lapply(1:nrow(phase_list[[x]]), function(y) phase_list[[x]][-y,])
+    new_phases <- lapply(new_list, function(y) circular(y$phase*pi/12))
+    new_summaries <- t(sapply(new_phases, function(y) summary(y)))[,c("Mean", "Rho")]
+    rownames(new_summaries) <- phase_list[[x]]$names
+    new_summaries[,"Mean"] <- new_summaries[,"Mean"]*12/pi
+    pos_res <- ifelse(as.numeric(new_summaries[,"Mean"]) < 0, 24 + as.numeric(new_summaries[,"Mean"]) ,as.numeric(new_summaries[,"Mean"]))
+    new_summaries[,"Mean"] <- pos_res - circa_result[x,"mean"]
+    new_summaries[,"Rho"] <- new_summaries[,"Rho"] - circa_result[x,"rho"]
+    res_lot[[x]] <- new_summaries
+  }
   
-  go_phases_list <- lapply(go_vector, function(x) go_phase_table_rapid(go_column, go_term = x, total_phases_table, id_column, functional_data))
+  return(res_lot)
   
-  go_circa_res <- lapply(go_phases_list, function(x) create_circular_table(x$phase, iter=iter))
-  
-  go_circa_num <- t(sapply(go_circa_res, function(x) unlist(x[1:7])))
-  go_circa_kupier <- sapply(go_circa_res, function(x) unlist(x[8]))
-  kupier_bh <- p.adjust(go_circa_kupier, method = "BH")
-  go_circa_ray <- sapply(go_circa_res, function(x) unlist(x[9]))
-  ray_bh <- p.adjust(go_circa_ray, method = "BH")
-  go_circa_hr <- sapply(go_circa_res, function(x) unlist(x[10]))
-  rh_bh <- p.adjust(go_circa_hr, method = "BH")
-  
-  go_circa_table <- data.frame(go_circa_num, kuiper_p_value=kupier_bh, rayleigh_p_value=ray_bh, hr_p_value=rh_bh)
-  rownames(go_circa_table) <- go_vector
-  
-  return(go_circa_table)
 }
 
+# Function to determine the most likely number of modes in the pressence of f-fold symmetry (2 or 3),
+# cluster genes in f clusters and determine the circular tables for each cluster
+multimodal_analysis <- function(circa_table)
+{
+  circa_radians <- circular(circa_table$phase*pi/12)
+  modes_summary <- summary(circa_radians)
+  modes_ray <- rayleigh.test(circa_radians, mu=circular(modes_summary["Mean"]))$p.value
+  
+  circa_radians_2 <- circular(((circa_table$phase*2) %% 24)*pi/12)
+  modes_summary_2 <- summary(circa_radians_2)
+  modes_ray_2 <- rayleigh.test(circa_radians_2, mu=circular(modes_summary_2["Mean"]))$p.value
+  
+  circa_radians_3 <- circular(((circa_table$phase*3) %% 24)*pi/12)
+  modes_summary_3 <- summary(circa_radians_3)
+  modes_ray_3 <- rayleigh.test(circa_radians_3, mu=circular(modes_summary_3["Mean"]))$p.value
+  
+  expected_modes <- which.min(c(modes_ray, modes_ray_2, modes_ray_3))
+  expected_p_value <- min(c(modes_ray, modes_ray_2, modes_ray_3))
+  
+  result_FOCC <- CirClust(circa_table$phase, expected_modes, 24, method = "FOCC")
+  clusters_focc <- lapply(1:max(result_FOCC$cluster), function(x) circa_table[result_FOCC$cluster == x,])
+  names(clusters_focc) <- paste0("cluster_", 1:max(result_FOCC$cluster))
+  
+  cluster_radians <- lapply(clusters_focc, function(x) circular(x$phase*pi/12))
+  cluster_summary <- sapply(cluster_radians, function(x) summary(x))
+  
+  cluster_table <- data.frame(n=cluster_summary["n",], first=cluster_summary["1st Qu.",]*12/pi, 
+                              median=cluster_summary["Median",]*12/pi, mean=cluster_summary["Mean",]*12/pi,
+                              third=cluster_summary["3rd Qu.",]*12/pi, rho=cluster_summary["Rho",],
+                              var=1-cluster_summary["Rho",])
+  pos_cluster <- apply(cluster_table[,2:5], MARGIN=2, function(x) ifelse(as.numeric(x) < 0, 24 + as.numeric(x) , as.numeric(x)))
+  cluster_table[,2:5] <- pos_cluster
+  
+  cluster_list <- list(expected_modes = expected_modes, expected_p_value = expected_p_value,
+                       total_p_values = c(modes_ray, modes_ray_2, modes_ray_3), summary = cluster_table)
+  cluster_list_res <- append(cluster_list, clusters_focc)
+  
+  return(cluster_list_res)
+}
+
+# Functions for plotting results
 # Circular boxplot function
 circular_boxplot <- function(res.table, filename, color.palette = "Tam",
                              tr.height = 0.1)
@@ -437,6 +522,67 @@ circular_boxplot <- function(res.table, filename, color.palette = "Tam",
   
   # Legend, establish values, lines, colors and the adjust position in the plot
   my_legend <- Legend(at = quan.table$go,
+                      legend_gp = gpar(fill = my_color), title_position = "topleft", 
+                      title = "")
+  draw(my_legend, x = unit(1, "npc") - unit(2, "mm"), y = unit(10, "mm"), 
+       just = c("right", "bottom"))
+  
+  circos.clear()
+  dev.off()
+}
+
+# Circular dotplot function
+circular_dotplot <- function(phases.list, filename, color.palette = "Tam",
+                             tr.height = 0.1)
+{
+  
+  png(filename, width = 1600, height = 1600, res=300)
+  
+  # Create axis and initialize plot
+  circos.par("start.degree" = 90, cell.padding = c(0, 0, 0, 0), gap.degree=0, track.margin =c(0.005, 0.005))
+  circos.initialize("a", xlim = c(0, 24)) # a means that there is a sector, which will go from 0 to 24
+  
+  circos.track(ylim = c(0, 1.5), track.height = 0.001, 
+               bg.col = NA, bg.border=NA, panel.fun = function(x, y) {
+                 breaks = seq(0, 24, by = 4)
+                 circos.axis(h = "top", major.at = breaks, labels = paste0("ZT", breaks), 
+                             labels.cex = 1, lwd = 2)
+               })
+  
+  
+  my_color=met.brewer(color.palette, n = length(phases.list))
+  #my_colors_rgb=lapply(my_color, function(x) col2rgb(x))
+  #my_transparent = sapply(my_colors_rgb, function(x) rgb(red = x[1,1], green = x[2,1], blue = x[3,1], alpha = 0.9, maxColorValue = 255))
+  my_transparent = sapply(my_color, function(x) add_transparency(x, 0.5))
+  
+  
+  # Depending on the data, it may happen that the boxplot cuts the sunrise in its
+  # lower segment, in the box itself, in its upper segment or not at all, 
+  # affecting the graph to be plotted. The for loop runs through all the GO 
+  # terms analyzed (if there are more than 8, the dimensions and the palette 
+  # used must be changed).
+  
+  
+  for (i in 1:length(phases.list))
+  {
+    
+    circos.track(ylim = c(0, 1.5), track.height = tr.height, 
+                 bg.col = "#eaeded", bg.border=NA, panel.fun = function(x, y) {
+                   xlim = CELL_META$xlim
+                   # Estos primeros segmentos son para marcar los ZT
+                   circos.segments(seq(0,24,4), 0,
+                                   seq(0,24,4), 1.5,
+                                   col = "gray", lwd = 3, lty=3)
+                   
+                   circos.points(phases.list[[i]]$phase, 0.75,
+                                 col = my_color[i], pch=21, bg=my_transparent[i])
+                   
+                 })
+    
+  }
+  
+  # Legend, establish values, lines, colors and the adjust position in the plot
+  my_legend <- Legend(at = names(phases.list),
                       legend_gp = gpar(fill = my_color), title_position = "topleft", 
                       title = "")
   draw(my_legend, x = unit(1, "npc") - unit(2, "mm"), y = unit(10, "mm"), 
