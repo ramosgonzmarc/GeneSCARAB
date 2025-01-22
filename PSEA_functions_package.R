@@ -104,6 +104,106 @@ HermansRasson2T <- function(data){
   return(T)
 }
 
+# HR for grouped data, with TB
+# Critical value calculation
+HermansRasson2T <- function(sample){
+  n <- length(sample)
+  total <- 0
+  for (i in 1:n){
+    for (j in 1:n){ total <- total + abs(abs(sample[i]-sample[j])-pi)-
+      (pi/2)
+    total <- total - (2.895*(abs(sin(sample[i]-sample[j]))-(2/pi)))}}
+  T <- total/n
+  return(T)}
+
+# Function
+HermansRasson2PGroupedRad <- function(sample, m, k=1000, iter=9999){
+  sample<-circular(sample)
+  sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
+  sample<- ifelse((sample<(0)),(sample+(2*pi)), sample)
+  sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
+  sample<- ifelse((sample<(0)),(sample+(2*pi)), sample)
+  n <- length(sample)
+  univals <- iter
+  testset<- rep(0,univals)
+  for (f in 1:univals){
+    data1 <- rcircularuniform(n, control.circular=list(units="radians"))
+    data1 <- trunc(data1*m/(2*pi))
+    data1 <- data1*2*pi/m
+    errorsamp <- rvonmises(n, 0, k,control.circular=list(units="radians"))
+    data1 <- data1+errorsamp
+    data1 <- ifelse((data1>(2*pi)),(data1-(2*pi)), data1)
+    testset[f] <- HermansRasson2T(data1)}
+  errorsamp2 <- rvonmises(n, 0, k,control.circular=list(units="radians"))
+  sample<-sample+errorsamp2
+  sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
+  Tsample <- HermansRasson2T(sample)
+  counter <- 0
+  for(j in 1:univals){if(testset[j]>=Tsample){counter <- counter+1}}
+  p <- counter/(univals+1)
+  return(p)}
+
+# Rao spacing test for continuous data
+RaoTestUngroupedRad <- function(sample, iter=9999){
+  # sample is the list of data points in radians measure, this can be a simple list 
+  # or a list of class circular
+  #sample <- rad(circular(sample)) for input in degrees
+  sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
+  sample<- ifelse((sample<(0)),(sample+(2*pi)), sample)
+  sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
+  sample<- ifelse((sample<(0)),(sample+(2*pi)), sample)
+  n <- length(sample)
+  univals <- iter
+  testset<- rep(0,univals)
+  for (f in 1:univals){
+    data1 <- rcircularuniform(n, control.circular=list(units="radians"))
+    testset[f] <- RaoTestValue(data1)}
+  Tsample <- RaoTestValue(sample)
+  counter <- 0
+  for(j in 1:univals){if(testset[j]>=Tsample){counter <- counter+1}}
+  p <- counter/(univals+1)
+  return(p)}
+
+# Rao spacing test with TB for grouped data
+# Critical function calculation
+RaoTestValue <- function(sample){n <- length(sample)
+f <- sort(sample)
+fplus <- c(f[2:n],f[1])
+T <- fplus - f
+T[n] <- (2*pi) - f[n] + f[1]
+abs_diff <- abs(T-(2*pi/n))
+U <- 0.5*sum(abs_diff)
+return(U)}
+
+# Function
+RaoPGroupedRad <- function(sample, m, k=1000, iter=9999){
+  sample<-circular(sample)
+  sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
+  sample<- ifelse((sample<(0)),(sample+(2*pi)), sample)
+  sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
+  sample<- ifelse((sample<(0)),(sample+(2*pi)), sample)
+  n <- length(sample)
+  univals <- iter
+  testset<- rep(0,univals)
+  for (f in 1:univals){
+    data1 <- rcircularuniform(n, control.circular=list(units="radians"))
+    data1 <- trunc(data1*m/(2*pi))
+    data1 <- data1*2*pi/m
+    errorsamp <- rvonmises(n, 0, k,control.circular=list(units="radians"))
+    data1 <- data1+errorsamp
+    data1 <- ifelse((data1>(2*pi)),(data1-(2*pi)), data1)
+    testset[f] <- RaoTestValue(data1)}
+  errorsamp2 <- rvonmises(n, 0, k,control.circular=list(units="radians"))
+  sample<-sample+errorsamp2
+  sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
+  Tsample <- RaoTestValue(sample)
+  counter <- 0
+  for(j in 1:univals){if(testset[j]>=Tsample){counter <- counter+1}}
+  p <- counter/(univals+1)
+  return(p)}
+
+
+
 # Functions to create input lists for GO terms and KEGG pathways
 create_gene_list_go <- function(go_vector, org.package, go_column, id_column)
 {
@@ -152,6 +252,7 @@ create_gene_list_go <- function(go_vector, org.package, go_column, id_column)
   
 }
 
+# REVISAR CUÁL ES LA BUENA
 create_gene_list_kegg <- function(ko_vector, org.package, ko_column, id_column)
 {
   functional_data <- select(get(org.package), 
@@ -175,18 +276,44 @@ create_gene_list_kegg <- function(ko_vector, org.package, ko_column, id_column)
   return(ko_list)
   
 }
+# TODO for more than 500 KO terms
+
+create_gene_list_kegg <- function(ko_vector, org.package, ko_column, id_column)
+{
+  functional_data <- select(get(org.package), 
+                            keys = keys(get(org.package),keytype=id_column), 
+                            columns =  c(id_column, ko_column))
+  
+  # Get pathways for selected KOs 
+  present_pathways <- sapply(ko_vector, function(x) keggLink("pathway", x))
+  unique_pathways <- unique(unlist(present_pathways))
+  map_pathways <- unique_pathways[grep("map", unique_pathways)] # maybe change this for ko in other versions
+  list_pathways <- sapply(strsplit(map_pathways, ":"), function(x) x[[2]])
+  
+  
+  kos_pathways <- lapply(list_pathways, function(x) keggLink("ko",x))
+  names(kos_pathways) <- list_pathways
+  kos_pathways_clean <- lapply(kos_pathways, function(x) unique(x))
+  kos_pathways_clean <- lapply(kos_pathways_clean, function(x) sapply(strsplit(x, ":"), function(y) y[[2]]))
+  ko_list <- lapply(kos_pathways_clean, function(x) subset(functional_data, grepl(x, functional_data[["KO"]]))[["GID"]])
+  ko_list <- lapply(ko_list, unique)
+  
+  return(ko_list)
+  
+}
 
 # Statistics and general workflow functions
 # Function to create a phase table list from gene lists
 gene.list.to.phases <- function(gene.list, phase.table)
 {
   circa_reduced <- lapply(gene.list, function(x) subset(phase.table, names %in% x))
-  return(circa_reduced)
+  circa_reduced_clean <- circa_reduced[which(sapply(circa_reduced, nrow) != 0)]
+  return(circa_reduced_clean)
   
 }
 
 # Function to create the circular table and deviation from the uniform distribution for a single set
-create_circular_table <- function(circa_vector, hr.on.large.sets = F, hr.on.large.sets.th=400,
+create_circular_table_bk <- function(circa_vector, hr.on.large.sets = F, hr.on.large.sets.th=400,
                                   iter = 999, force.hr=F, force.hr.th=0.05)
 {
   
@@ -238,15 +365,169 @@ create_circular_table <- function(circa_vector, hr.on.large.sets = F, hr.on.larg
   
 }
 
+create_circular_table <- function(circa_vector,hr.on.large.sets = F, hr.on.large.sets.th=400,
+                                  iter.hr = 999, force.hr=F, force.hr.th=0.05, 
+                                  rao.on.large.sets = F, rao.on.large.sets.th=400,
+                                  iter.rao = 999, force.rao=F, force.rao.th=0.05)
+{
+  
+  circa_radians <- circular(circa_vector*pi/12)
+  
+  # Calculate circular measures
+  circa_summary <- summary(circa_radians) # "n", "Min.", "1st Qu.", "Median", "Mean", "3rd Qu.", "Max.", "Rho"
+  
+  # Calculate circular variance and transform to hours again
+  circa_var <- var.circular(circa_radians)
+  
+  # Apply kupier's test
+  circa_kupier <- kuiper(circa_radians, rads = T, R=1)$p.value
+  
+  # Apply Rayleigh's test
+  circa_ray <- rayleigh.test(circa_radians, mu=circular(circa_summary["Mean"]))$p.value
+  
+  # Apply HR test
+  if (iter.hr == 0)
+  {
+    circa_hr <- NA
+  }
+  
+  else if (!(force.hr) & (circa_kupier <= force.hr.th | circa_ray <= force.hr.th))
+  {
+    circa_hr <- NA
+  }
+  
+  else if (!(hr.on.large.sets) & (length(circa_radians) >= hr.on.large.sets.th))
+  {
+    circa_hr <- NA
+  }
+  
+  else
+  {
+    circa_hr <- HR_test(circa_radians, original = F, iter = iter.hr)
+  }
+  
+  # Apply Rao test
+  if (iter.rao == 0)
+  {
+    circa_rao <- NA
+  }
+  
+  else if (!(force.rao) & (circa_kupier <= force.rao.th | circa_ray <= force.rao.th))
+  {
+    circa_rao <- NA
+  }
+  
+  else if (!(rao.on.large.sets) & (length(circa_radians) >= rao.on.large.sets.th))
+  {
+    circa_rao <- NA
+  }
+  
+  else
+  {
+    circa_rao <- RaoTestUngroupedRad(circa_radians, iter = iter.rao)
+  }
+  
+  # Create table
+  circa_table <- data.frame(n=circa_summary["n"], first=circa_summary["1st Qu."]*12/pi, 
+                            median=circa_summary["Median"]*12/pi, mean=circa_summary["Mean"]*12/pi,
+                            third=circa_summary["3rd Qu."]*12/pi, rho=circa_summary["Rho"], 
+                            var=circa_var, kuiper_p_value=circa_kupier, rayleigh_p_value=circa_ray, 
+                            hr_p_value = circa_hr[2], rao_p_value = circa_rao )
+  
+  
+  return(circa_table)
+  
+}
+
+# Function to create the circular table and deviation from the uniform distribution for a single set of grouped data
+create_circular_table_grouped <- function(circa_vector, n_bins,hr.on.large.sets = F, hr.on.large.sets.th=400,
+                                  iter.hr = 999, force.hr=F, force.hr.th=0.05, 
+                                  rao.on.large.sets = F, rao.on.large.sets.th=400,
+                                  iter.rao = 999, force.rao=F, force.rao.th=0.05, error_kappa=1000)
+{
+  
+  circa_radians <- circular(circa_vector*pi/12)
+  
+  # Calculate circular measures
+  circa_summary <- summary(circa_radians) # "n", "Min.", "1st Qu.", "Median", "Mean", "3rd Qu.", "Max.", "Rho"
+  
+  # Calculate circular variance and transform to hours again
+  circa_var <- var.circular(circa_radians)
+  
+  # Apply kupier's test
+  circa_kupier <- kuiper(circa_radians, rads = T, R=1)$p.value
+  
+  # Apply Rayleigh's test
+  circa_ray <- rayleigh.test(circa_radians, mu=circular(circa_summary["Mean"]))$p.value
+  
+  # Apply HR test
+  if (iter.hr == 0)
+  {
+    circa_hr <- NA
+  }
+  
+  else if (!(force.hr) & (circa_kupier <= force.hr.th | circa_ray <= force.hr.th))
+  {
+    circa_hr <- NA
+  }
+  
+  else if (!(hr.on.large.sets) & (length(circa_radians) >= hr.on.large.sets.th))
+  {
+    circa_hr <- NA
+  }
+  
+  else
+  {
+    circa_hr <- HermansRasson2PGroupedRad(circa_radians, m=n_bins, k=error_kappa, iter=iter.hr)
+  }
+  
+  # Apply Rao test
+  if (iter.rao == 0)
+  {
+    circa_rao <- NA
+  }
+  
+  else if (!(force.rao) & (circa_kupier <= force.rao.th | circa_ray <= force.rao.th))
+  {
+    circa_rao <- NA
+  }
+  
+  else if (!(rao.on.large.sets) & (length(circa_radians) >= rao.on.large.sets.th))
+  {
+    circa_rao <- NA
+  }
+  
+  else
+  {
+    circa_rao <- RaoPGroupedRad(circa_radians, m=n_bins, k=error_kappa, iter=iter.rao) 
+  }
+  
+  # Create table
+  circa_table <- data.frame(n=circa_summary["n"], first=circa_summary["1st Qu."]*12/pi, 
+                            median=circa_summary["Median"]*12/pi, mean=circa_summary["Mean"]*12/pi,
+                            third=circa_summary["3rd Qu."]*12/pi, rho=circa_summary["Rho"], 
+                            var=circa_var, kuiper_p_value=circa_kupier, rayleigh_p_value=circa_ray, 
+                            hr_p_value = circa_hr[2], rao_p_value = circa_rao )
+  
+  
+  return(circa_table)
+  
+}
+
 # Function to create the circular table and deviation from the uniform distribution for a phases list
 complete_circular_table <- function(phase.list, hr.on.large.sets = F, hr.on.large.sets.th=400,
-                                    iter = 999, force.hr=F, force.hr.th=0.05)
+                                    iter.hr = 999, force.hr=F, force.hr.th=0.05, 
+                                    rao.on.large.sets = F, rao.on.large.sets.th=400,
+                                    iter.rao = 999, force.rao=F, force.rao.th=0.05)
 {
   
   # Generate circular statistics table per GO
   go_circa_res <- lapply(phase.list, function(x) create_circular_table(x$phase, hr.on.large.sets = hr.on.large.sets, 
-                                                                       hr.on.large.sets.th=hr.on.large.sets.th, iter=iter,
-                                                                       force.hr=force.hr, force.hr.th=force.hr.th))
+                                                                       hr.on.large.sets.th=hr.on.large.sets.th, iter.hr=iter.hr,
+                                                                       force.hr=force.hr, force.hr.th=force.hr.th,
+                                                                       rao.on.large.sets = rao.on.large.sets, 
+                                                                       rao.on.large.sets.th=rao.on.large.sets.th, iter.rao=iter.rao,
+                                                                       force.rao=force.rao, force.rao.th=force.rao.th))
   
   # Adjust p-values due to multiple testing
   go_circa_num <- t(sapply(go_circa_res, function(x) unlist(x[1:7])))
@@ -256,11 +537,53 @@ complete_circular_table <- function(phase.list, hr.on.large.sets = F, hr.on.larg
   ray_bh <- p.adjust(go_circa_ray, method = "BH")
   go_circa_hr <- sapply(go_circa_res, function(x) unlist(x[10]))
   rh_bh <- p.adjust(go_circa_hr, method = "BH")
+  go_circa_rao <- sapply(go_circa_res, function(x) unlist(x[11]))
+  rao_bh <- p.adjust(go_circa_rao, method = "BH")
   
   # Return updated table
   go_circa_table <- data.frame(go_circa_num, kuiper_p_value=go_circa_kupier, kuiper_p_value_adj=kupier_bh, 
                                rayleigh_p_value=go_circa_ray, rayleigh_p_value_adj=ray_bh,
-                               hr_p_value=go_circa_hr, hr_p_value_adj=rh_bh)
+                               hr_p_value=go_circa_hr, hr_p_value_adj=rh_bh, rao_p_value=go_circa_rao, rao_p_value_adj=rao_bh)
+  rownames(go_circa_table) <- names(phase.list)
+  
+  
+  # Transform negative means and quantiles to positive
+  pos_res <- apply(go_circa_table[,2:5], MARGIN=2, function(x) ifelse(as.numeric(x) < 0, 24 + as.numeric(x) , as.numeric(x)))
+  go_circa_table[,2:5] <- pos_res
+  
+  return(go_circa_table)
+}
+
+# Function to create the circular table and deviation from the uniform distribution for a grouped phases list
+complete_circular_table_grouped <- function(phase.list, n_bins,hr.on.large.sets = F, hr.on.large.sets.th=400,
+                                    iter.hr = 999, force.hr=F, force.hr.th=0.05, 
+                                    rao.on.large.sets = F, rao.on.large.sets.th=400,
+                                    iter.rao = 999, force.rao=F, force.rao.th=0.05, error_kappa=1000)
+{
+  
+  # Generate circular statistics table per GO
+  go_circa_res <- lapply(phase.list, function(x) create_circular_table_grouped(x$phase, n_bins=n_bins, hr.on.large.sets = hr.on.large.sets, 
+                                                                       hr.on.large.sets.th=hr.on.large.sets.th, iter.hr=iter.hr,
+                                                                       force.hr=force.hr, force.hr.th=force.hr.th,
+                                                                       rao.on.large.sets = rao.on.large.sets, 
+                                                                       rao.on.large.sets.th=rao.on.large.sets.th, iter.rao=iter.rao,
+                                                                       force.rao=force.rao, force.rao.th=force.rao.th, error_kappa=error_kappa))
+  
+  # Adjust p-values due to multiple testing
+  go_circa_num <- t(sapply(go_circa_res, function(x) unlist(x[1:7])))
+  go_circa_kupier <- sapply(go_circa_res, function(x) unlist(x[8]))
+  kupier_bh <- p.adjust(go_circa_kupier, method = "BH")
+  go_circa_ray <- sapply(go_circa_res, function(x) unlist(x[9]))
+  ray_bh <- p.adjust(go_circa_ray, method = "BH")
+  go_circa_hr <- sapply(go_circa_res, function(x) unlist(x[10]))
+  rh_bh <- p.adjust(go_circa_hr, method = "BH")
+  go_circa_rao <- sapply(go_circa_res, function(x) unlist(x[11]))
+  rao_bh <- p.adjust(go_circa_rao, method = "BH")
+  
+  # Return updated table
+  go_circa_table <- data.frame(go_circa_num, kuiper_p_value=go_circa_kupier, kuiper_p_value_adj=kupier_bh, 
+                               rayleigh_p_value=go_circa_ray, rayleigh_p_value_adj=ray_bh,
+                               hr_p_value=go_circa_hr, hr_p_value_adj=rh_bh, rao_p_value=go_circa_rao, rao_p_value_adj=rao_bh)
   rownames(go_circa_table) <- names(phase.list)
   
   
@@ -287,6 +610,7 @@ test_against_gen_dist <- function(phase.list, total.phase.table)
   return(gen_dist_table)
 }
 
+
 # Fuction for comparing the distributions of to different phase lists
 test_two_dist <- function(phase.list.1, phase.list.2)
 {
@@ -295,7 +619,7 @@ test_two_dist <- function(phase.list.1, phase.list.2)
     stop("Error: length of lists differ.")
   }
   
-  if (names(phase.list.1) != names(phase.list.2))
+  if (sum(names(phase.list.1) == names(phase.list.2)) != length(phase.list.1))
   {
     warning("The names of the sets do not match, check if they should.")
   }
@@ -304,10 +628,10 @@ test_two_dist <- function(phase.list.1, phase.list.2)
                                                              ~ c(rep("first", nrow(x)), rep("second", nrow(y)))))$stats[1,6],
                                phase.list.1, phase.list.2)
   
-  p_values_diff_bh <- p.adjust(p_values_diff_test, method = "BH")
+  p_values_diff_bh <- p.adjust(unlist(p_values_diff_test), method = "BH")
   
-  p_values_diff_table <- data.frame(p_value=p_values_diff_test, 
-                                    p_value_adj=p_values_diff_bh)
+  p_values_diff_table <- data.frame(gen_dist_p_value=unlist(p_values_diff_test), 
+                                    gen_dist_p_value_adj=p_values_diff_bh)
   
   return(p_values_diff_table)
 }
