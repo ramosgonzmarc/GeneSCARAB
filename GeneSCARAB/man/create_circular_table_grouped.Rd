@@ -7,17 +7,15 @@
 create_circular_table_grouped(
   circa_vector,
   n_bins,
-  hr.on.large.sets = F,
   hr.on.large.sets.th = 400,
   iter.hr = 999,
-  force.hr = F,
   force.hr.th = 0.05,
-  rao.on.large.sets = F,
   rao.on.large.sets.th = 400,
   iter.rao = 999,
-  force.rao = F,
   force.rao.th = 0.05,
-  error_kappa = 1000
+  kuiper.on.large.sets.th = 400,
+  iter.kuiper = 999,
+  force.kuiper.th = 0.05
 )
 }
 \arguments{
@@ -25,27 +23,23 @@ create_circular_table_grouped(
 
 \item{n_bins}{Number of bins}
 
-\item{hr.on.large.sets}{Whether to perform HR test on sets of a greater size than the number stated in hr.on.large.sets.th, logical}
-
 \item{hr.on.large.sets.th}{Threshold indicating the maximum size of a set to perform HR test on}
 
 \item{iter.hr}{Number of iterations for HR test}
 
-\item{force.hr}{Whether to perform HR test on sets that have rejected uniformity for Rayleigh or Kuiper tests at a significance level of force.hr.th, logical}
-
-\item{force.hr.th}{Significance level to use for force.hr}
-
-\item{rao.on.large.sets}{Whether to perform Rao test on sets of a greater size than the number stated in rao.on.large.sets.th, logical}
+\item{force.hr.th}{Significance level to execute HR test if Rayleigh and Kuiper p-values are higher}
 
 \item{rao.on.large.sets.th}{Threshold indicating the maximum size of a set to perform Rao test on}
 
 \item{iter.rao}{Number of iterations for Rao test}
 
-\item{force.rao}{Whether to perform Rao test on sets that have rejected uniformity for Rayleigh or Kuiper tests at a significance level of force.hr.th, logical}
+\item{force.rao.th}{Significance level to execute Rao test if Rayleigh, Kuiper and HR p-values are higher}
 
-\item{force.rao.th}{Significance level to use for force.rao}
+\item{kuiper.on.large.sets.th}{Threshold indicating the maximum size of a set to perform Kuiper test on}
 
-\item{error_kappa}{Kappa for the error distribution for HR and Rao grouped tests}
+\item{iter.kuiper}{Number of iterations for Kuiper test}
+
+\item{force.kuiper.th}{Significance level to execute Kuiper test if Rayleigh p-value is higher}
 }
 \value{
 A data.frame indicating number of phases used for computation (n); mean, rho, variance, first, second and third quantiles of the circular distribution in hours; and p-values for each of the four tests
@@ -53,5 +47,5 @@ A data.frame indicating number of phases used for computation (n); mean, rho, va
 \description{
 Function that takes a vector of gene phases (discrete measurements or non-parametric estimates)
 and returns statistical measures of their circular distribution and their deviations from a
-circular uniform distribution based on adapted Rayleigh, Kuiper, Hermans-Rasson and Rao tests.
+circular uniform distribution based on Rayleigh and adapted versions of Kuiper, Hermans-Rasson and Rao tests.
 }

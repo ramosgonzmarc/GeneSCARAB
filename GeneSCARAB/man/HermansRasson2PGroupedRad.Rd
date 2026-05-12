@@ -4,14 +4,12 @@
 \alias{HermansRasson2PGroupedRad}
 \title{HR test's p-value calculation for grouped data}
 \usage{
-HermansRasson2PGroupedRad(sample, m, k = 1000, iter = 9999)
+HermansRasson2PGroupedRad(sample, m, iter = 9999)
 }
 \arguments{
 \item{sample}{Data points in radians}
 
 \item{m}{Number of bins}
-
-\item{k}{Kappa for the error distribution}
 
 \item{iter}{Number of iterations}
 }

@@ -6,40 +6,28 @@
 \usage{
 complete_circular_table(
   phase.list,
-  hr.on.large.sets = F,
   hr.on.large.sets.th = 400,
   iter.hr = 999,
-  force.hr = F,
   force.hr.th = 0.05,
-  rao.on.large.sets = F,
   rao.on.large.sets.th = 400,
   iter.rao = 999,
-  force.rao = F,
   force.rao.th = 0.05
 )
 }
 \arguments{
 \item{phase.list}{Phases list in the same format as the output of gene.list.to.phases}
 
-\item{hr.on.large.sets}{Whether to perform HR test on sets of a greater size than the number stated in hr.on.large.sets.th, logical}
-
 \item{hr.on.large.sets.th}{Threshold indicating the maximum size of a set to perform HR test on}
 
 \item{iter.hr}{Number of iterations for HR test}
 
-\item{force.hr}{Whether to perform HR test on sets that have rejected uniformity for Rayleigh or Kuiper tests at a significance level of force.hr.th, logical}
-
-\item{force.hr.th}{Significance level to use for force.hr}
-
-\item{rao.on.large.sets}{Whether to perform Rao test on sets of a greater size than the number stated in rao.on.large.sets.th, logical}
+\item{force.hr.th}{Significance level to execute HR test if Rayleigh and Kuiper p-values are higher}
 
 \item{rao.on.large.sets.th}{Threshold indicating the maximum size of a set to perform Rao test on}
 
 \item{iter.rao}{Number of iterations for Rao test}
 
-\item{force.rao}{Whether to perform Rao test on sets that have rejected uniformity for Rayleigh or Kuiper tests at a significance level of force.hr.th, logical}
-
-\item{force.rao.th}{Significance level to use for force.rao}
+\item{force.rao.th}{Significance level to execute Rao test if Rayleigh, Kuiper and HR p-values are higher}
 }
 \value{
 A data.frame indicating, for each process or gene set: number of phases used for computation (n); mean, rho, variance, first, second and third quantiles of the circular distribution in hours; p-values and adjusted p-values for each of the four tests

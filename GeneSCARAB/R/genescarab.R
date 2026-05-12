@@ -31,13 +31,13 @@ HermansRasson2T <- function(sample){
 #'
 #' @param sample Data points in radians
 #' @param m Number of bins
-#' @param k Kappa for the error distribution
 #' @param iter Number of iterations
 #'
 #' @returns The p-value for the test
 #'
 #' @examples
-HermansRasson2PGroupedRad <- function(sample, m, k=1000, iter=9999){
+HermansRasson2PGroupedRad <- function(sample, m, iter=9999){
+  k <- (m^2) / (pi^2)
   sample<-circular::circular(sample)
   sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
   sample<- ifelse((sample<(0)),(sample+(2*pi)), sample)
@@ -124,13 +124,13 @@ RaoTestUngroupedRad <- function(sample, iter=9999){
 #'
 #' @param sample Data points in radians
 #' @param m Number of bins
-#' @param k Kappa for the error distribution
 #' @param iter Number of iterations
 #'
 #' @returns The p-value for the test
 #'
 #' @examples
-RaoPGroupedRad <- function(sample, m, k=1000, iter=9999){
+RaoPGroupedRad <- function(sample, m, iter=9999){
+  k <- (m^2) / (pi^2)
   sample<-circular::circular(sample)
   sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
   sample<- ifelse((sample<(0)),(sample+(2*pi)), sample)
@@ -151,6 +151,48 @@ RaoPGroupedRad <- function(sample, m, k=1000, iter=9999){
   sample<-sample+errorsamp2
   sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
   Tsample <- RaoTestValue(sample)
+  counter <- 0
+  for(j in 1:univals){if(testset[j]>=Tsample){counter <- counter+1}}
+  p <- counter/(univals+1)
+  return(p)}
+
+#' Kuiper test's p-value calculation for grouped data
+#'
+#' Helper function that calculates the p-value of an adaptation of the Kuiper test
+#' for grouped data (discrete phases) as implemented in the article "Grouped circular data in biology: advice for effectively
+#' implementing statistical procedures" https://doi.org/10.1007/s00265-020-02881-6.
+#'
+#' @param sample Data points in radians
+#' @param m Number of bins
+#' @param iter Number of iterations
+#'
+#' @returns The p-value for the test
+#'
+#' @examples
+KuiperPGroupedRad <- function(sample, m, iter=9999){
+  k <- (m^2) / (pi^2)
+  sample<-circular(sample)
+  sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
+  sample<- ifelse((sample<(0)),(sample+(2*pi)), sample)
+  sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
+  sample<- ifelse((sample<(0)),(sample+(2*pi)), sample)
+  n <- length(sample)
+  univals <- iter
+  testset<- rep(0,univals)
+  for (f in 1:univals){
+    data1 <- rcircularuniform(n, control.circular=list(units="radians"))
+    data1 <- trunc(data1*m/(2*pi))
+    data1 <- data1*2*pi/m
+    errorsamp <- rvonmises(n, 0, k,control.circular=list(units="radians"))
+    data1 <- data1+errorsamp
+    data1 <- ifelse((data1>(2*pi)),(data1-(2*pi)), data1)
+    kuiper1 <-kuiper.test(data1)
+    testset[f] <-kuiper1$statistic }
+  errorsamp2 <- rvonmises(n, 0, k,control.circular=list(units="radians"))
+  sample<-sample+errorsamp2
+  sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
+  kuiper2 <-kuiper.test(sample)
+  Tsample <- kuiper2$statistic
   counter <- 0
   for(j in 1:univals){if(testset[j]>=Tsample){counter <- counter+1}}
   p <- counter/(univals+1)
@@ -349,26 +391,22 @@ gene.list.to.phases <- function(gene.list, phase.table)
 #' circular uniform distribution based on the Rayleigh, Kuiper, Hermans-Rasson and Rao tests.
 #'
 #' @param circa_vector Phases vector
-#' @param hr.on.large.sets Whether to perform HR test on sets of a greater size than the number stated in hr.on.large.sets.th, logical
 #' @param hr.on.large.sets.th Threshold indicating the maximum size of a set to perform HR test on
 #' @param iter.hr Number of iterations for HR test
-#' @param force.hr Whether to perform HR test on sets that have rejected uniformity for Rayleigh or Kuiper tests at a significance level of force.hr.th, logical
-#' @param force.hr.th Significance level to use for force.hr
-#' @param rao.on.large.sets Whether to perform Rao test on sets of a greater size than the number stated in rao.on.large.sets.th, logical
+#' @param force.hr.th Significance level to execute HR test if Rayleigh and Kuiper p-values are higher
 #' @param rao.on.large.sets.th Threshold indicating the maximum size of a set to perform Rao test on
 #' @param iter.rao Number of iterations for Rao test
-#' @param force.rao Whether to perform Rao test on sets that have rejected uniformity for Rayleigh or Kuiper tests at a significance level of force.hr.th, logical
-#' @param force.rao.th Significance level to use for force.rao
+#' @param force.rao.th Significance level to execute Rao test if Rayleigh, Kuiper and HR p-values are higher
 #'
 #' @returns A table indicating number of phases used for computation (n); mean, rho, variance, first, second and third quantiles of the circular distribution in hours; and p-values for each of the four tests
 #' @export
 #'
 #' @examples
 #'
-create_circular_table <- function(circa_vector,hr.on.large.sets = F, hr.on.large.sets.th=400,
-                                  iter.hr = 999, force.hr=F, force.hr.th=0.05,
-                                  rao.on.large.sets = F, rao.on.large.sets.th=400,
-                                  iter.rao = 999, force.rao=F, force.rao.th=0.05)
+create_circular_table <- function(circa_vector,hr.on.large.sets.th=400,
+                                  iter.hr = 999, force.hr.th=0.05,
+                                  rao.on.large.sets.th=400,
+                                  iter.rao = 999, force.rao.th=0.05)
 {
   circa_radians <- circular::circular(circa_vector*pi/12)
 
@@ -378,8 +416,8 @@ create_circular_table <- function(circa_vector,hr.on.large.sets = F, hr.on.large
   # Calculate circular variance and transform to hours again
   circa_var <- circular::var.circular(circa_radians)
 
-  # Apply kupier's test
-  circa_kupier <- Directional::kuiper(circa_radians, rads = T, R=1)$p.value
+  # Apply kuiper's test
+  circa_kuiper <- Directional::kuiper(circa_radians, rads = T, R=1)$p.value
 
   # Apply Rayleigh's test
   circa_ray <- circular::rayleigh.test(circa_radians, mu=circular::circular(circa_summary["Mean"]))$p.value
@@ -390,12 +428,12 @@ create_circular_table <- function(circa_vector,hr.on.large.sets = F, hr.on.large
     circa_hr <- NA
   }
 
-  else if (!(force.hr) & (circa_kupier <= force.hr.th | circa_ray <= force.hr.th))
+  else if (circa_kuiper <= force.hr.th | circa_ray <= force.hr.th)
   {
     circa_hr <- NA
   }
 
-  else if (!(hr.on.large.sets) & (length(circa_radians) >= hr.on.large.sets.th))
+  else if (length(circa_radians) >= hr.on.large.sets.th)
   {
     circa_hr <- NA
   }
@@ -406,17 +444,17 @@ create_circular_table <- function(circa_vector,hr.on.large.sets = F, hr.on.large
   }
 
   # Apply Rao test
-  if (iter.rao == 0)
+  if (iter.rao  == 0)
   {
     circa_rao <- NA
   }
 
-  else if (!(force.rao) & (circa_kupier <= force.rao.th | circa_ray <= force.rao.th))
+  else if (circa_kuiper <= force.rao.th | circa_ray <= force.rao.th | circa_hr[2] <= force.rao.th)
   {
     circa_rao <- NA
   }
 
-  else if (!(rao.on.large.sets) & (length(circa_radians) >= rao.on.large.sets.th))
+  else if (length(circa_radians) >= rao.on.large.sets.th)
   {
     circa_rao <- NA
   }
@@ -430,7 +468,7 @@ create_circular_table <- function(circa_vector,hr.on.large.sets = F, hr.on.large
   circa_table <- data.frame(n=circa_summary["n"], first=circa_summary["1st Qu."]*12/pi,
                             median=circa_summary["Median"]*12/pi, mean=circa_summary["Mean"]*12/pi,
                             third=circa_summary["3rd Qu."]*12/pi, rho=circa_summary["Rho"],
-                            var=circa_var, kuiper_p_value=circa_kupier, rayleigh_p_value=circa_ray,
+                            var=circa_var, kuiper_p_value=circa_kuiper, rayleigh_p_value=circa_ray,
                             hr_p_value = circa_hr[2], rao_p_value = circa_rao )
 
 
@@ -443,31 +481,30 @@ create_circular_table <- function(circa_vector,hr.on.large.sets = F, hr.on.large
 #'
 #' Function that takes a vector of gene phases (discrete measurements or non-parametric estimates)
 #' and returns statistical measures of their circular distribution and their deviations from a
-#' circular uniform distribution based on adapted Rayleigh, Kuiper, Hermans-Rasson and Rao tests.
+#' circular uniform distribution based on Rayleigh and adapted versions of Kuiper, Hermans-Rasson and Rao tests.
 #'
 #'
 #' @param circa_vector Discrete phases vector
 #' @param n_bins Number of bins
-#' @param hr.on.large.sets Whether to perform HR test on sets of a greater size than the number stated in hr.on.large.sets.th, logical
 #' @param hr.on.large.sets.th Threshold indicating the maximum size of a set to perform HR test on
 #' @param iter.hr Number of iterations for HR test
-#' @param force.hr Whether to perform HR test on sets that have rejected uniformity for Rayleigh or Kuiper tests at a significance level of force.hr.th, logical
-#' @param force.hr.th Significance level to use for force.hr
-#' @param rao.on.large.sets Whether to perform Rao test on sets of a greater size than the number stated in rao.on.large.sets.th, logical
+#' @param force.hr.th Significance level to execute HR test if Rayleigh and Kuiper p-values are higher
 #' @param rao.on.large.sets.th Threshold indicating the maximum size of a set to perform Rao test on
 #' @param iter.rao Number of iterations for Rao test
-#' @param force.rao Whether to perform Rao test on sets that have rejected uniformity for Rayleigh or Kuiper tests at a significance level of force.hr.th, logical
-#' @param force.rao.th Significance level to use for force.rao
-#' @param error_kappa Kappa for the error distribution for HR and Rao grouped tests
+#' @param force.rao.th Significance level to execute Rao test if Rayleigh, Kuiper and HR p-values are higher
+#' @param kuiper.on.large.sets.th Threshold indicating the maximum size of a set to perform Kuiper test on
+#' @param iter.kuiper Number of iterations for Kuiper test
+#' @param force.kuiper.th Significance level to execute Kuiper test if Rayleigh p-value is higher
 #'
 #' @returns A data.frame indicating number of phases used for computation (n); mean, rho, variance, first, second and third quantiles of the circular distribution in hours; and p-values for each of the four tests
 #' @export
 #'
 #' @examples
-create_circular_table_grouped <- function(circa_vector, n_bins,hr.on.large.sets = F, hr.on.large.sets.th=400,
-                                  iter.hr = 999, force.hr=F, force.hr.th=0.05,
-                                  rao.on.large.sets = F, rao.on.large.sets.th=400,
-                                  iter.rao = 999, force.rao=F, force.rao.th=0.05, error_kappa=1000)
+create_circular_table_grouped <- function(circa_vector, n_bins,
+                                          hr.on.large.sets.th=400, iter.hr = 999, force.hr.th=0.05,
+                                          rao.on.large.sets.th=400, iter.rao = 999, force.rao.th=0.05,
+                                          kuiper.on.large.sets.th=400, iter.kuiper = 999,
+                                          force.kuiper.th=0.05)
 {
 
   circa_radians <- circular::circular(circa_vector*pi/12)
@@ -478,43 +515,54 @@ create_circular_table_grouped <- function(circa_vector, n_bins,hr.on.large.sets 
   # Calculate circular variance and transform to hours again
   circa_var <- circular::var.circular(circa_radians)
 
-  # Apply kupier's test
-  circa_kupier <- Directional::kuiper(circa_radians, rads = T, R=1)$p.value
-
   # Apply Rayleigh's test
   circa_ray <- circular::rayleigh.test(circa_radians, mu=circular::circular(circa_summary["Mean"]))$p.value
 
-  # Apply HR test
   if (is.na(circa_ray))
   {
-    circa_table <- data.frame(n=circa_summary["n"], first=circa_summary["1st Qu."]*12/pi,
-                              median=circa_summary["Median"]*12/pi, mean=circa_summary["Mean"]*12/pi,
-                              third=circa_summary["3rd Qu."]*12/pi, rho=circa_summary["Rho"],
-                              var=circa_var, kuiper_p_value=circa_kupier, rayleigh_p_value=1,
-                              hr_p_value = 1, rao_p_value = 1 )
-
-
-    return(circa_table)
+    circa_ray <- 1
   }
 
+  # Apply Kuiper test
+  if (iter.kuiper == 0)
+  {
+    circa_kuiper <- NA
+  }
+
+  else if (circa_ray <= force.kuiper.th)
+  {
+    circa_kuiper <- NA
+  }
+
+  else if (length(circa_radians) >= kuiper.on.large.sets.th)
+  {
+    circa_kuiper <- NA
+  }
+
+  else
+  {
+    circa_kuiper <- KuiperPGroupedRad(circa_radians, m=n_bins, iter=iter.kuiper)
+  }
+
+  # Apply HR test
   if (iter.hr == 0)
   {
     circa_hr <- NA
   }
 
-  else if (!(force.hr) & (circa_kupier <= force.hr.th | circa_ray <= force.hr.th))
+  else if (circa_ray <= force.hr.th | circa_kuiper <= force.hr.th)
   {
     circa_hr <- NA
   }
 
-  else if (!(hr.on.large.sets) & (length(circa_radians) >= hr.on.large.sets.th))
+  else if (length(circa_radians) >= hr.on.large.sets.th)
   {
     circa_hr <- NA
   }
 
   else
   {
-    circa_hr <- HermansRasson2PGroupedRad(circa_radians, m=n_bins, k=error_kappa, iter=iter.hr)
+    circa_hr <- HermansRasson2PGroupedRad(circa_radians, m=n_bins, iter=iter.hr)
   }
 
   # Apply Rao test
@@ -523,26 +571,26 @@ create_circular_table_grouped <- function(circa_vector, n_bins,hr.on.large.sets 
     circa_rao <- NA
   }
 
-  else if (!(force.rao) & (circa_kupier <= force.rao.th | circa_ray <= force.rao.th))
+  else if (circa_kuiper <= force.rao.th | circa_ray <= force.rao.th | circa_hr <= force.rao.th)
   {
     circa_rao <- NA
   }
 
-  else if (!(rao.on.large.sets) & (length(circa_radians) >= rao.on.large.sets.th))
+  else if (length(circa_radians) >= rao.on.large.sets.th)
   {
     circa_rao <- NA
   }
 
   else
   {
-    circa_rao <- RaoPGroupedRad(circa_radians, m=n_bins, k=error_kappa, iter=iter.rao)
+    circa_rao <- RaoPGroupedRad(circa_radians, m=n_bins, iter=iter.rao)
   }
 
   # Create table
   circa_table <- data.frame(n=circa_summary["n"], first=circa_summary["1st Qu."]*12/pi,
                             median=circa_summary["Median"]*12/pi, mean=circa_summary["Mean"]*12/pi,
                             third=circa_summary["3rd Qu."]*12/pi, rho=circa_summary["Rho"],
-                            var=circa_var, kuiper_p_value=circa_kupier, rayleigh_p_value=circa_ray,
+                            var=circa_var, kuiper_p_value=circa_kuiper, rayleigh_p_value=circa_ray,
                             hr_p_value = circa_hr[2], rao_p_value = circa_rao )
 
 
@@ -558,39 +606,34 @@ create_circular_table_grouped <- function(circa_vector, n_bins,hr.on.large.sets 
 #' for each one using the Rayleigh, Kuiper, Hermans-Rasson, and Rao tests.
 #'
 #' @param phase.list Phases list in the same format as the output of gene.list.to.phases
-#' @param hr.on.large.sets Whether to perform HR test on sets of a greater size than the number stated in hr.on.large.sets.th, logical
 #' @param hr.on.large.sets.th Threshold indicating the maximum size of a set to perform HR test on
 #' @param iter.hr Number of iterations for HR test
-#' @param force.hr Whether to perform HR test on sets that have rejected uniformity for Rayleigh or Kuiper tests at a significance level of force.hr.th, logical
-#' @param force.hr.th Significance level to use for force.hr
-#' @param rao.on.large.sets Whether to perform Rao test on sets of a greater size than the number stated in rao.on.large.sets.th, logical
+#' @param force.hr.th Significance level to execute HR test if Rayleigh and Kuiper p-values are higher
 #' @param rao.on.large.sets.th Threshold indicating the maximum size of a set to perform Rao test on
 #' @param iter.rao Number of iterations for Rao test
-#' @param force.rao Whether to perform Rao test on sets that have rejected uniformity for Rayleigh or Kuiper tests at a significance level of force.hr.th, logical
-#' @param force.rao.th Significance level to use for force.rao
+#' @param force.rao.th Significance level to execute Rao test if Rayleigh, Kuiper and HR p-values are higher
 #'
 #' @returns A data.frame indicating, for each process or gene set: number of phases used for computation (n); mean, rho, variance, first, second and third quantiles of the circular distribution in hours; p-values and adjusted p-values for each of the four tests
 #' @export
 #'
 #' @examples
-complete_circular_table <- function(phase.list, hr.on.large.sets = F, hr.on.large.sets.th=400,
-                                    iter.hr = 999, force.hr=F, force.hr.th=0.05,
-                                    rao.on.large.sets = F, rao.on.large.sets.th=400,
-                                    iter.rao = 999, force.rao=F, force.rao.th=0.05)
+complete_circular_table <- function(phase.list, hr.on.large.sets.th=400,
+                                    iter.hr = 999, force.hr.th=0.05,
+                                    rao.on.large.sets.th=400,
+                                    iter.rao = 999, force.rao.th=0.05)
 {
 
   # Generate circular statistics table per GO
-  go_circa_res <- lapply(phase.list, function(x) create_circular_table(x$phase, hr.on.large.sets = hr.on.large.sets,
+  go_circa_res <- lapply(phase.list, function(x) create_circular_table(x$phase,
                                                                        hr.on.large.sets.th=hr.on.large.sets.th, iter.hr=iter.hr,
-                                                                       force.hr=force.hr, force.hr.th=force.hr.th,
-                                                                       rao.on.large.sets = rao.on.large.sets,
+                                                                       force.hr.th=force.hr.th,
                                                                        rao.on.large.sets.th=rao.on.large.sets.th, iter.rao=iter.rao,
-                                                                       force.rao=force.rao, force.rao.th=force.rao.th))
+                                                                       force.rao.th=force.rao.th))
 
   # Adjust p-values due to multiple testing
   go_circa_num <- t(sapply(go_circa_res, function(x) unlist(x[1:7])))
-  go_circa_kupier <- sapply(go_circa_res, function(x) unlist(x[8]))
-  kupier_bh <- p.adjust(go_circa_kupier, method = "BH")
+  go_circa_kuiper <- sapply(go_circa_res, function(x) unlist(x[8]))
+  kuiper_bh <- p.adjust(go_circa_kuiper, method = "BH")
   go_circa_ray <- sapply(go_circa_res, function(x) unlist(x[9]))
   ray_bh <- p.adjust(go_circa_ray, method = "BH")
   go_circa_hr <- sapply(go_circa_res, function(x) unlist(x[10]))
@@ -599,7 +642,7 @@ complete_circular_table <- function(phase.list, hr.on.large.sets = F, hr.on.larg
   rao_bh <- p.adjust(go_circa_rao, method = "BH")
 
   # Return updated table
-  go_circa_table <- data.frame(go_circa_num, kuiper_p_value=go_circa_kupier, kuiper_p_value_adj=kupier_bh,
+  go_circa_table <- data.frame(go_circa_num, kuiper_p_value=go_circa_kuiper, kuiper_p_value_adj=kuiper_bh,
                                rayleigh_p_value=go_circa_ray, rayleigh_p_value_adj=ray_bh,
                                hr_p_value=go_circa_hr, hr_p_value_adj=rh_bh, rao_p_value=go_circa_rao, rao_p_value_adj=rao_bh)
   rownames(go_circa_table) <- names(phase.list)
@@ -621,40 +664,40 @@ complete_circular_table <- function(phase.list, hr.on.large.sets = F, hr.on.larg
 #'
 #' @param phase.list Phases list in the same format as the output of gene.list.to.phases
 #' @param n_bins Number of bins
-#' @param hr.on.large.sets Whether to perform HR test on sets of a greater size than the number stated in hr.on.large.sets.th, logical
 #' @param hr.on.large.sets.th Threshold indicating the maximum size of a set to perform HR test on
 #' @param iter.hr Number of iterations for HR test
-#' @param force.hr Whether to perform HR test on sets that have rejected uniformity for Rayleigh or Kuiper tests at a significance level of force.hr.th, logical
-#' @param force.hr.th Significance level to use for force.hr
-#' @param rao.on.large.sets Whether to perform Rao test on sets of a greater size than the number stated in rao.on.large.sets.th, logical
+#' @param force.hr.th Significance level to execute HR test if Rayleigh and Kuiper p-values are higher
 #' @param rao.on.large.sets.th Threshold indicating the maximum size of a set to perform Rao test on
 #' @param iter.rao Number of iterations for Rao test
-#' @param force.rao Whether to perform Rao test on sets that have rejected uniformity for Rayleigh or Kuiper tests at a significance level of force.hr.th, logical
-#' @param force.rao.th Significance level to use for force.rao
-#' @param error_kappa Kappa for the error distribution for HR and Rao grouped tests
+#' @param force.rao.th Significance level to execute Rao test if Rayleigh, Kuiper and HR p-values are higher
+#' @param kuiper.on.large.sets.th Threshold indicating the maximum size of a set to perform kuiper test on
+#' @param iter.kuiper Number of iterations for kuiper test
+#' @param force.kuiper.th Significance level to execute Kuiper test if Rayleigh p-value is higher
 #'
 #' @returns A data.frame indicating, for each process or gene set: number of phases used for computation (n); mean, rho, variance, first, second and third quantiles of the circular distribution in hours; p-values and adjusted p-values for each of the four tests
 #' @export
 #'
 #' @examples
-complete_circular_table_grouped <- function(phase.list, n_bins,hr.on.large.sets = F, hr.on.large.sets.th=400,
-                                    iter.hr = 999, force.hr=F, force.hr.th=0.05,
-                                    rao.on.large.sets = F, rao.on.large.sets.th=400,
-                                    iter.rao = 999, force.rao=F, force.rao.th=0.05, error_kappa=1000)
+complete_circular_table_grouped <- function(phase.list, n_bins,
+                                            hr.on.large.sets.th=400, iter.hr = 999, force.hr.th=0.05,
+                                            rao.on.large.sets.th=400, iter.rao = 999, force.rao.th=0.05,
+                                            kuiper.on.large.sets.th=400, iter.kuiper=999, force.kuiper.th=0.05)
 {
 
   # Generate circular statistics table per GO
-  go_circa_res <- lapply(phase.list, function(x) create_circular_table_grouped(x$phase, n_bins=n_bins, hr.on.large.sets = hr.on.large.sets,
+  go_circa_res <- lapply(phase.list, function(x) create_circular_table_grouped(x$phase, n_bins=n_bins,
                                                                        hr.on.large.sets.th=hr.on.large.sets.th, iter.hr=iter.hr,
-                                                                       force.hr=force.hr, force.hr.th=force.hr.th,
-                                                                       rao.on.large.sets = rao.on.large.sets,
+                                                                       force.hr.th=force.hr.th,
                                                                        rao.on.large.sets.th=rao.on.large.sets.th, iter.rao=iter.rao,
-                                                                       force.rao=force.rao, force.rao.th=force.rao.th, error_kappa=error_kappa))
+                                                                       force.rao.th=force.rao.th,
+                                                                       kuiper.on.large.sets.th=kuiper.on.large.sets.th,
+                                                                       iter.kuiper = iter.kuiper,
+                                                                       force.kuiper.th=force.kuiper.th))
 
   # Adjust p-values due to multiple testing
   go_circa_num <- t(sapply(go_circa_res, function(x) unlist(x[1:7])))
-  go_circa_kupier <- sapply(go_circa_res, function(x) unlist(x[8]))
-  kupier_bh <- p.adjust(go_circa_kupier, method = "BH")
+  go_circa_kuiper <- sapply(go_circa_res, function(x) unlist(x[8]))
+  kuiper_bh <- p.adjust(go_circa_kuiper, method = "BH")
   go_circa_ray <- sapply(go_circa_res, function(x) unlist(x[9]))
   ray_bh <- p.adjust(go_circa_ray, method = "BH")
   go_circa_hr <- sapply(go_circa_res, function(x) unlist(x[10]))
@@ -663,7 +706,7 @@ complete_circular_table_grouped <- function(phase.list, n_bins,hr.on.large.sets 
   rao_bh <- p.adjust(go_circa_rao, method = "BH")
 
   # Return updated table
-  go_circa_table <- data.frame(go_circa_num, kuiper_p_value=go_circa_kupier, kuiper_p_value_adj=kupier_bh,
+  go_circa_table <- data.frame(go_circa_num, kuiper_p_value=go_circa_kuiper, kuiper_p_value_adj=kuiper_bh,
                                rayleigh_p_value=go_circa_ray, rayleigh_p_value_adj=ray_bh,
                                hr_p_value=go_circa_hr, hr_p_value_adj=rh_bh, rao_p_value=go_circa_rao, rao_p_value_adj=rao_bh)
   rownames(go_circa_table) <- names(phase.list)
