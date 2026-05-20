@@ -428,12 +428,12 @@ create_circular_table <- function(circa_vector,hr.on.large.sets.th=400,
     circa_hr <- NA
   }
 
-  else if (circa_kuiper <= force.hr.th | circa_ray <= force.hr.th)
+  else if (isTRUE(circa_kuiper <= force.hr.th | circa_ray <= force.hr.th))
   {
     circa_hr <- NA
   }
 
-  else if (length(circa_radians) >= hr.on.large.sets.th)
+  else if (isTRUE(length(circa_radians) >= hr.on.large.sets.th))
   {
     circa_hr <- NA
   }
@@ -449,12 +449,12 @@ create_circular_table <- function(circa_vector,hr.on.large.sets.th=400,
     circa_rao <- NA
   }
 
-  else if (circa_kuiper <= force.rao.th | circa_ray <= force.rao.th | circa_hr[2] <= force.rao.th)
+  else if (isTRUE(circa_kuiper <= force.rao.th | circa_ray <= force.rao.th | circa_hr[2] <= force.rao.th))
   {
     circa_rao <- NA
   }
 
-  else if (length(circa_radians) >= rao.on.large.sets.th)
+  else if (isTRUE(length(circa_radians) >= rao.on.large.sets.th))
   {
     circa_rao <- NA
   }
@@ -529,12 +529,12 @@ create_circular_table_grouped <- function(circa_vector, n_bins,
     circa_kuiper <- NA
   }
 
-  else if (circa_ray <= force.kuiper.th)
+  else if (isTRUE(circa_ray <= force.kuiper.th))
   {
     circa_kuiper <- NA
   }
 
-  else if (length(circa_radians) >= kuiper.on.large.sets.th)
+  else if (isTRUE(length(circa_radians) >= kuiper.on.large.sets.th))
   {
     circa_kuiper <- NA
   }
@@ -550,12 +550,12 @@ create_circular_table_grouped <- function(circa_vector, n_bins,
     circa_hr <- NA
   }
 
-  else if (circa_ray <= force.hr.th | circa_kuiper <= force.hr.th)
+  else if (isTRUE(circa_ray <= force.hr.th | circa_kuiper <= force.hr.th))
   {
     circa_hr <- NA
   }
 
-  else if (length(circa_radians) >= hr.on.large.sets.th)
+  else if (isTRUE(length(circa_radians) >= hr.on.large.sets.th))
   {
     circa_hr <- NA
   }
@@ -571,12 +571,12 @@ create_circular_table_grouped <- function(circa_vector, n_bins,
     circa_rao <- NA
   }
 
-  else if (circa_kuiper <= force.rao.th | circa_ray <= force.rao.th | circa_hr <= force.rao.th)
+  else if (isTRUE(circa_kuiper <= force.rao.th | circa_ray <= force.rao.th | circa_hr <= force.rao.th))
   {
     circa_rao <- NA
   }
 
-  else if (length(circa_radians) >= rao.on.large.sets.th)
+  else if (isTRUE(length(circa_radians) >= rao.on.large.sets.th))
   {
     circa_rao <- NA
   }
@@ -591,7 +591,7 @@ create_circular_table_grouped <- function(circa_vector, n_bins,
                             median=circa_summary["Median"]*12/pi, mean=circa_summary["Mean"]*12/pi,
                             third=circa_summary["3rd Qu."]*12/pi, rho=circa_summary["Rho"],
                             var=circa_var, kuiper_p_value=circa_kuiper, rayleigh_p_value=circa_ray,
-                            hr_p_value = circa_hr[2], rao_p_value = circa_rao )
+                            hr_p_value = circa_hr, rao_p_value = circa_rao )
 
 
   return(circa_table)
