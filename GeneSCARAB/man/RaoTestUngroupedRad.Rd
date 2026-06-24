@@ -16,7 +16,9 @@ The p-value for the test
 }
 \description{
 Helper function that calculates the p-value of Rao's spacing test
-for ungrouped data (continuous phases) as implemented in the article "Circular
-statistics meets practical limitations: a simulation-based Rao’s spacing
-test for non-continuous data" https://doi.org/10.1186/s40462-019-0160-x.
+for ungrouped data (continuous phases) as implemented
+in the article "Circular statistics meets practical
+limitations: a simulation-based Rao’s spacing
+test for non-continuous data"
+https://doi.org/10.1186/s40462-019-0160-x.
 }

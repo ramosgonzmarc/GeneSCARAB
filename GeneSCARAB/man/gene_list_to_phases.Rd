@@ -7,24 +7,35 @@
 gene_list_to_phases(gene.list, phase.table)
 }
 \arguments{
-\item{gene.list}{Process or gene sets list (as the output of create_gene_list_go and create_gene_list_kegg)}
+\item{gene.list}{Process or gene sets list (as the output
+of create_gene_list_go and create_gene_list_kegg)}
 
-\item{phase.table}{Table showing acrophases for the complete gene set under study, stated in hours}
+\item{phase.table}{Table showing acrophases for the
+complete gene set under study, stated in hours}
 }
 \value{
 A list containing phase tables for each process or gene set
 }
 \description{
-Function that takes a list of genes associated with specific biological processes (GO, KEGG) or gene sets
-and a general phase table, and returns a list consisting of the phase tables specific to each set.
+Function that takes a list of genes associated with
+specific biological processes (GO, KEGG) or gene sets
+and a general phase table, and returns a list consisting
+of the phase tables specific to each set.
 }
 \examples{
 library(org.Otauri.eg.db)
 data("circa_table_genescarab")
 
-total_phases_table_sd <- data.frame(names=rownames(circa_table_genescarab),
-phase=as.numeric(circa_table_genescarab[["sd.peak.time.hours"]]))
-go.list.test <- create_gene_list_go(go_vector = "GO:0005515",
-org.package = "org.Otauri.eg.db", go_column = "GO", id_column = "GID")
+total_phases_table_sd <- data.frame(
+    names = rownames(circa_table_genescarab),
+    phase = as.numeric(
+        circa_table_genescarab[["sd.peak.time.hours"]]
+    )
+)
+go.list.test <- create_gene_list_go(
+    go_vector = "GO:0005515",
+    org.package = "org.Otauri.eg.db", go_column = "GO",
+    id_column = "GID"
+)
 gene_list_to_phases(go.list.test, total_phases_table_sd)
 }

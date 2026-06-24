@@ -14,7 +14,9 @@ create_gene_list_kegg(
 )
 }
 \arguments{
-\item{ko_vector}{KO vector to be included in the analysis, along with their pathways ancestors. "all" takes the complete set from the annotation package}
+\item{ko_vector}{KO vector to be included in the analysis,
+along with their pathways ancestors. "all" takes the
+complete set from the annotation package}
 
 \item{org.package}{Species annotation package}
 
@@ -22,21 +24,29 @@ create_gene_list_kegg(
 
 \item{id_column}{Gene ID column name in the annotation package}
 
-\item{ko_prefix}{Prefix used to denote KEGG pathways, either "map" or "ko", depending on package version}
+\item{ko_prefix}{Prefix used to denote KEGG pathways, either
+"map" or "ko", depending on package version}
 
-\item{species}{Species group to filter final pathways ("all" for no filtering), either "bacteria", "archaea", "animals", "plants", "fungi" or "protists"}
+\item{species}{Species group to filter final pathways ("all"
+for no filtering), either "bacteria", "archaea", "animals",
+"plants", "fungi" or "protists"}
 }
 \value{
-A list linking each KEGG pathway with the genes that share that annotation
+A list linking each KEGG pathway with the genes
+that share that annotation
 }
 \description{
-Function to create a list of genes associated with each KEGG pathway based on a
-species annotation package with KO terms deribed from KEGGREST, KAAS or similar tools. It also allows
+Function to create a list of genes associated with each KEGG
+pathway based on a species annotation package with KO terms
+derived from KEGGREST, KAAS or similar tools. It also allows
 filtering by species group.
 }
 \examples{
 library("org.Knitens.eg.db")
-create_gene_list_kegg(ko_vector = "K10666", org.package = "org.Knitens.eg.db",
-ko_column = "KO", id_column = "GID", ko_prefix = "map", species = "plants")
+create_gene_list_kegg(
+    ko_vector = "K10666", org.package = "org.Knitens.eg.db",
+    ko_column = "KO", id_column = "GID", ko_prefix = "map",
+    species = "plants"
+)
 
 }

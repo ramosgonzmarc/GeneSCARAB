@@ -7,40 +7,64 @@
 multimodal_analysis(phase_table)
 }
 \arguments{
-\item{phase_table}{A phase table, as the individual elements of the list derived from gene_list_to_phases}
+\item{phase_table}{A phase table, as the individual
+elements of the list derived from gene_list_to_phases}
 }
 \value{
-A list containing the most likely mode number, the p-value for that number, the p-values corresponding to each mode number, the circular summary table for each cluster and the genes contained in each cluster
+A list containing the most likely mode number,
+the p-value for that number, the p-values corresponding
+to each mode number, the circular summary table for each
+cluster and the genes contained in each cluster
 }
 \description{
-Function to determine the most likely number of modes in the presence of f-fold symmetry (1, 2 or 3),
-cluster genes in f clusters and determine the statistic summary for each cluster
+Function to determine the most likely number of modes
+in the presence of f-fold symmetry (1, 2 or 3),
+cluster genes in f clusters and determine the statistic
+summary for each cluster
 }
 \examples{
 library(org.Otauri.eg.db)
 data("circa_table_genescarab")
-total_phases_table_sd <- data.frame(names=rownames(circa_table_genescarab),
-phase=as.numeric(circa_table_genescarab[["sd.peak.time.hours"]]))
+total_phases_table_sd <- data.frame(
+    names = rownames(circa_table_genescarab),
+    phase = as.numeric(
+        circa_table_genescarab[["sd.peak.time.hours"]]
+    )
+)
 functional_data <- select(org.Otauri.eg.db,
-                         keys = keys(org.Otauri.eg.db,keytype="GID"),
-                         columns =  c("GID", "GO"))
+    keys = keys(org.Otauri.eg.db, keytype = "GID"),
+    columns = c("GID", "GO")
+)
 complete_gos <- unique(functional_data$GO)
 complete_gos <- complete_gos[!is.na(complete_gos)]
 set.seed(2345)
-subset_gos <- complete_gos[sample(1:length(complete_gos), 50, replace = FALSE)]
-go.list.test <- create_gene_list_go(go_vector = subset_gos,
-org.package = "org.Otauri.eg.db",
-go_column = "GO", id_column = "GID")
-phases.list.sd <- gene_list_to_phases(go.list.test, total_phases_table_sd)
-phases.list.sd.clean <- phases.list.sd[which(sapply(phases.list.sd, nrow) != 0)]
-go.circa.table.sd <- complete_circular_table(phase.list = phases.list.sd.clean,
-                                            hr.on.large.sets.th = 200,
-                                            force.hr.th = 0.04,
-                                            rao.on.large.sets.th = 200,
-                                            force.rao.th = 0.04,
-                                            iter.rao = 999, iter.hr = 999)
-multi_table <- go.circa.table.sd[which(go.circa.table.sd$hr_p_value < 0.05 &
-                                         go.circa.table.sd$n > 2),]
+subset_gos <- complete_gos[sample(seq_len(
+    length(complete_gos)
+), 50, replace = FALSE)]
+go.list.test <- create_gene_list_go(
+    go_vector = subset_gos,
+    org.package = "org.Otauri.eg.db",
+    go_column = "GO", id_column = "GID"
+)
+phases.list.sd <- gene_list_to_phases(
+    go.list.test,
+    total_phases_table_sd
+)
+phases.list.sd.clean <- phases.list.sd[which(
+    sapply(phases.list.sd, nrow) != 0
+)]
+go.circa.table.sd <- complete_circular_table(
+    phase.list = phases.list.sd.clean,
+    hr.on.large.sets.th = 200,
+    force.hr.th = 0.04,
+    rao.on.large.sets.th = 200,
+    force.rao.th = 0.04,
+    iter.rao = 999, iter.hr = 999
+)
+multi_table <- go.circa.table.sd[which(
+    go.circa.table.sd$hr_p_value < 0.05 &
+        go.circa.table.sd$n > 2
+), ]
 multi_go <- rownames(multi_table)[1]
 phase_table_multi_go <- phases.list.sd.clean[[multi_go]]
 multimodal_list <- multimodal_analysis(phase_table_multi_go)

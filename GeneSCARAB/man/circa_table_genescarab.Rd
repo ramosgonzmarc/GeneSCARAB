@@ -11,8 +11,11 @@ Data frame
 data(circa_table_genescarab)
 }
 \description{
-Dataset example with phase information in two different conditions for Ostreococcus tauri
-from "Multiomics integration unveils photoperiodic plasticity in the molecular rhythms of
-marine phytoplankton" (https://doi.org/10.1093/plcell/koaf033)
+Dataset example with phase information in two
+different conditions for Ostreococcus tauri
+from "Multiomics integration unveils photoperiodic
+plasticity in the molecular rhythms of
+marine phytoplankton"
+(https://doi.org/10.1093/plcell/koaf033)
 }
 \keyword{datasets}

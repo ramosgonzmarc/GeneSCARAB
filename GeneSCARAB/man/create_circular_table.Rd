@@ -2,7 +2,8 @@
 % Please edit documentation in R/genescarab.R
 \name{create_circular_table}
 \alias{create_circular_table}
-\title{Creation of the circular table and deviation from the uniform distribution for a single set}
+\title{Creation of the circular table and deviation from
+the uniform distribution for a single set}
 \usage{
 create_circular_table(
   circa_vector,
@@ -17,25 +18,32 @@ create_circular_table(
 \arguments{
 \item{circa_vector}{Phases vector}
 
-\item{hr.on.large.sets.th}{Threshold indicating the maximum size of a set to perform HR test on}
+\item{hr.on.large.sets.th}{Threshold indicating the maximum size
+of a set to perform HR test on}
 
 \item{iter.hr}{Number of iterations for HR test}
 
-\item{force.hr.th}{Significance level to execute HR test if Rayleigh and Kuiper p-values are higher}
+\item{force.hr.th}{Significance level to execute HR test if
+Rayleigh and Kuiper p-values are higher}
 
-\item{rao.on.large.sets.th}{Threshold indicating the maximum size of a set to perform Rao test on}
+\item{rao.on.large.sets.th}{Threshold indicating the maximum
+size of a set to perform Rao test on}
 
 \item{iter.rao}{Number of iterations for Rao test}
 
-\item{force.rao.th}{Significance level to execute Rao test if Rayleigh, Kuiper and HR p-values are higher}
+\item{force.rao.th}{Significance level to execute Rao test if
+Rayleigh, Kuiper and HR p-values are higher}
 }
 \value{
-A table indicating number of phases used for computation (n); mean, rho, variance, first,
-second and third quantiles of the circular distribution in hours; and p-values for each of the four
-tests
+A table indicating number of phases used for
+computation (n); mean, rho, variance, first,
+second and third quantiles of the circular distribution
+in hours; and p-values for each of the four tests
 }
 \description{
-Function that takes a vector of gene phases (continuous measurements or parametric estimates)
-and returns statistical measures of their circular distribution and their deviations from a
-circular uniform distribution based on the Rayleigh, Kuiper, Hermans-Rasson and Rao tests.
+Function that takes a vector of gene phases (continuous
+measurements or parametric estimates) and returns
+statistical measures of their circular distribution
+and their deviations from a circular uniform distribution
+based on the Rayleigh, Kuiper, Hermans-Rasson and Rao tests.
 }

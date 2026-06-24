@@ -7,7 +7,9 @@
 create_gene_list_go(go_vector = c("all"), org.package, go_column, id_column)
 }
 \arguments{
-\item{go_vector}{GO terms vector to be included in the analysis, along with their ancestors. "all" takes the complete set from the annotation package}
+\item{go_vector}{GO terms vector to be included in the
+analysis, along with their ancestors. "all" takes the
+complete set from the annotation package}
 
 \item{org.package}{Species annotation package}
 
@@ -16,15 +18,20 @@ create_gene_list_go(go_vector = c("all"), org.package, go_column, id_column)
 \item{id_column}{Gene ID column name in the annotation package}
 }
 \value{
-A list linking each GO term with the genes that share that annotation
+A list linking each GO term with the genes
+that share that annotation
 }
 \description{
-Function to create a list of genes associated with each GO term based on a
-species annotation package. This includes all ancestor GO terms of the selected ones.
+Function to create a list of genes associated with each GO
+term based on a species annotation package. This includes
+all ancestor GO terms of the selected ones.
 }
 \examples{
 library(org.Otauri.eg.db)
-go.list.test <- create_gene_list_go(go_vector = "GO:0005515",
-org.package = "org.Otauri.eg.db", go_column = "GO", id_column = "GID")
+go.list.test <- create_gene_list_go(
+    go_vector = "GO:0005515",
+    org.package = "org.Otauri.eg.db", go_column = "GO",
+    id_column = "GID"
+)
 
 }

@@ -2,53 +2,84 @@
 % Please edit documentation in R/genescarab.R
 \name{gene_contribution_to_set}
 \alias{gene_contribution_to_set}
-\title{Contribution of each gene in a set to the temporal cohesion of the whole set}
+\title{Contribution of each gene in a set to the temporal
+cohesion of the whole set}
 \usage{
 gene_contribution_to_set(circa_result, phase_list)
 }
 \arguments{
-\item{circa_result}{Table with circular distribution results, as the output from
+\item{circa_result}{Table with circular distribution
+results, as the output from
 complete_circular_table or complete_circular_table_grouped}
 
-\item{phase_list}{Phases list in the same format as the output of gene_list_to_phases, containing the row names of circa_result as names of each element}
+\item{phase_list}{Phases list in the same format as
+the output of gene_list_to_phases, containing the row
+names of circa_result as names of each element}
 }
 \value{
-A list whose elements are tables indicating the difference in circular mean and rho due to removing each gene for each process or gene set, and the rank of each difference
+A list whose elements are tables indicating
+the difference in circular mean and rho due to removing
+each gene for each process or gene set, and the rank
+of each difference
 }
 \description{
-Function that measures the contribution to the mean and rho of the circular distribution of a
-process or gene set for each of its constituent genes by removing them one by one. For sets
-consisting on more than 100 genes, it takes a random sample of 100 gene phases to normalize
+Function that measures the contribution to
+the mean and rho of the circular distribution of a
+process or gene set for each of its constituent
+genes by removing them one by one. For sets
+consisting on more than 100 genes, it takes a
+random sample of 100 gene phases to normalize
 and ensure noticiable changes.
 }
 \examples{
 library(org.Otauri.eg.db)
 data("circa_table_genescarab")
-total_phases_table_sd <- data.frame(names=rownames(circa_table_genescarab),
-phase=as.numeric(circa_table_genescarab[["sd.peak.time.hours"]]))
+total_phases_table_sd <- data.frame(
+    names = rownames(
+        circa_table_genescarab
+    ),
+    phase = as.numeric(
+        circa_table_genescarab[["sd.peak.time.hours"]]
+    )
+)
 
 functional_data <- select(org.Otauri.eg.db,
-                          keys = keys(org.Otauri.eg.db,keytype="GID"),
-                          columns =  c("GID", "GO"))
+    keys = keys(org.Otauri.eg.db, keytype = "GID"),
+    columns = c("GID", "GO")
+)
 complete_gos <- unique(functional_data$GO)
 complete_gos <- complete_gos[!is.na(complete_gos)]
 
 set.seed(2345)
-subset_gos <- complete_gos[sample(1:length(complete_gos), 50, replace = FALSE)]
-go.list.test <- create_gene_list_go(go_vector = subset_gos,
-org.package = "org.Otauri.eg.db",
-go_column = "GO", id_column = "GID")
-phases.list.sd <- gene_list_to_phases(go.list.test, total_phases_table_sd)
-phases.list.sd.clean <- phases.list.sd[which(sapply(phases.list.sd, nrow) != 0)][1:3]
-go.circa.table.sd <- complete_circular_table(phase.list = phases.list.sd.clean,
-                                             hr.on.large.sets.th = 200,
-                                             force.hr.th = 0.04,
-                                             rao.on.large.sets.th = 200,
-                                             force.rao.th = 0.04,
-                                             iter.rao = 999, iter.hr = 999)
-gene_contributions <- gene_contribution_to_set(circa_result =
-go.circa.table.sd[1,],
-phase_list = phases.list.sd.clean[rownames(go.circa.table.sd)[1]])
-
+subset_gos <- complete_gos[sample(
+    seq_len(length(complete_gos)), 50,
+    replace = FALSE
+)]
+go.list.test <- create_gene_list_go(
+    go_vector = subset_gos,
+    org.package = "org.Otauri.eg.db",
+    go_column = "GO", id_column = "GID"
+)
+phases.list.sd <- gene_list_to_phases(
+    go.list.test, total_phases_table_sd
+)
+phases.list.sd.clean <- phases.list.sd[which(
+    sapply(phases.list.sd, nrow) != 0
+)][seq_len(3)]
+go.circa.table.sd <- complete_circular_table(
+    phase.list = phases.list.sd.clean,
+    hr.on.large.sets.th = 200,
+    force.hr.th = 0.04,
+    rao.on.large.sets.th = 200,
+    force.rao.th = 0.04,
+    iter.rao = 999, iter.hr = 999
+)
+gene_contributions <- gene_contribution_to_set(
+    circa_result =
+        go.circa.table.sd[1, ],
+    phase_list = phases.list.sd.clean[rownames(
+        go.circa.table.sd
+    )[1]]
+)
 
 }

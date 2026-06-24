@@ -13,7 +13,8 @@ RaoTestValue(sample)
 The critical value for the test
 }
 \description{
-Helper function that calculates the critical value for Rao's spacing test as
-implemented in the article "Grouped circular data in biology: advice for effectively
-implementing statistical procedures" https://doi.org/10.1007/s00265-020-02881-6.
+Helper function that calculates the critical value for
+Rao's spacing test as implemented in the article "Grouped
+circular data in biology: advice for effectively implementing
+statistical procedures" https://doi.org/10.1007/s00265-020-02881-6.
 }

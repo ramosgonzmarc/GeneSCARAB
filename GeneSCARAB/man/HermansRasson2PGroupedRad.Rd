@@ -17,8 +17,9 @@ HermansRasson2PGroupedRad(sample, m, iter = 9999)
 The p-value for the test
 }
 \description{
-Helper function that calculates the p-value of an adaptation of the Hermans-Rasson test
-for grouped data (discrete phases) as implemented in the article "Grouped circular data
-in biology: advice for effectively implementing statistical procedures"
+Helper function that calculates the p-value of an adaptation of the
+Hermans-Rasson test for grouped data (discrete phases) as
+implemented in the article "Grouped circular data in biology:
+advice for effectively implementing statistical procedures"
 https://doi.org/10.1007/s00265-020-02881-6.
 }
