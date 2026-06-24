@@ -10,7 +10,6 @@
 #'
 #' @returns The critical value for the test
 #'
-#' @examples
 HermansRasson2T <- function(sample){
   n <- length(sample)
   total <- 0
@@ -35,7 +34,6 @@ HermansRasson2T <- function(sample){
 #'
 #' @returns The p-value for the test
 #'
-#' @examples
 HermansRasson2PGroupedRad <- function(sample, m, iter=9999){
   k <- (m^2) / (pi^2)
   sample<-circular::circular(sample)
@@ -74,7 +72,6 @@ HermansRasson2PGroupedRad <- function(sample, m, iter=9999){
 #'
 #' @returns The critical value for the test
 #'
-#' @examples
 RaoTestValue <- function(sample){n <- length(sample)
 f <- sort(sample)
 fplus <- c(f[2:n],f[1])
@@ -97,7 +94,6 @@ return(U)}
 #'
 #' @returns The p-value for the test
 #'
-#' @examples
 RaoTestUngroupedRad <- function(sample, iter=9999){
   sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
   sample<- ifelse((sample<(0)),(sample+(2*pi)), sample)
@@ -128,7 +124,6 @@ RaoTestUngroupedRad <- function(sample, iter=9999){
 #'
 #' @returns The p-value for the test
 #'
-#' @examples
 RaoPGroupedRad <- function(sample, m, iter=9999){
   k <- (m^2) / (pi^2)
   sample<-circular::circular(sample)
@@ -168,10 +163,9 @@ RaoPGroupedRad <- function(sample, m, iter=9999){
 #'
 #' @returns The p-value for the test
 #'
-#' @examples
 KuiperPGroupedRad <- function(sample, m, iter=9999){
   k <- (m^2) / (pi^2)
-  sample<-circular(sample)
+  sample<- circular::circular(sample)
   sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
   sample<- ifelse((sample<(0)),(sample+(2*pi)), sample)
   sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
@@ -180,24 +174,23 @@ KuiperPGroupedRad <- function(sample, m, iter=9999){
   univals <- iter
   testset<- rep(0,univals)
   for (f in 1:univals){
-    data1 <- rcircularuniform(n, control.circular=list(units="radians"))
+    data1 <- circular::rcircularuniform(n, control.circular=list(units="radians"))
     data1 <- trunc(data1*m/(2*pi))
     data1 <- data1*2*pi/m
-    errorsamp <- rvonmises(n, 0, k,control.circular=list(units="radians"))
+    errorsamp <- circular::rvonmises(n, 0, k,control.circular=list(units="radians"))
     data1 <- data1+errorsamp
     data1 <- ifelse((data1>(2*pi)),(data1-(2*pi)), data1)
-    kuiper1 <-kuiper.test(data1)
-    testset[f] <-kuiper1$statistic }
-  errorsamp2 <- rvonmises(n, 0, k,control.circular=list(units="radians"))
+    kuiper1 <- circular::kuiper.test(data1)
+    testset[f] <- kuiper1$statistic }
+  errorsamp2 <- circular::rvonmises(n, 0, k,control.circular=list(units="radians"))
   sample<-sample+errorsamp2
   sample<- ifelse((sample>(2*pi)),(sample-(2*pi)), sample)
-  kuiper2 <-kuiper.test(sample)
+  kuiper2 <- circular::kuiper.test(sample)
   Tsample <- kuiper2$statistic
   counter <- 0
   for(j in 1:univals){if(testset[j]>=Tsample){counter <- counter+1}}
   p <- counter/(univals+1)
   return(p)}
-
 
 
 #' Creation of input lists for GO terms from an annotation package
@@ -214,11 +207,15 @@ KuiperPGroupedRad <- function(sample, m, iter=9999){
 #' @export
 #'
 #' @examples
+#' library(org.Otauri.eg.db)
+#' go.list.test <- create_gene_list_go(go_vector = "GO:0005515",
+#' org.package = "org.Otauri.eg.db", go_column = "GO", id_column = "GID")
+#'
 create_gene_list_go <- function(go_vector = c("all"), org.package, go_column, id_column)
 {
 
-  functional_data <- select(get(org.package),
-                            keys = keys(get(org.package),keytype=id_column),
+  functional_data <- AnnotationDbi::select(get(org.package),
+                            keys = AnnotationDbi::keys(get(org.package),keytype=id_column),
                             columns =  c(id_column, go_column))
   if (length(go_vector) == 1 & go_vector[1] == "all")
     {
@@ -235,7 +232,7 @@ create_gene_list_go <- function(go_vector = c("all"), org.package, go_column, id
   l <- list(bp_ancestors, mf_ancestors, cc_ancestors)
   l_keys <- unique(unlist(lapply(l, names)))
 
-  go_ancestors <- setNames(do.call(mapply, c(FUN=c, lapply(l, `[`, l_keys))), l_keys)
+  go_ancestors <- stats::setNames(do.call(mapply, c(FUN=c, lapply(l, `[`, l_keys))), l_keys)
   go_ancestors <- lapply(go_ancestors, function(x) x[!is.na(x)])
   go_ancestors <- lapply(go_ancestors, function(x) x[x != "all"])
   go_vec_ancestors <- unlist(go_ancestors)
@@ -253,7 +250,7 @@ create_gene_list_go <- function(go_vector = c("all"), org.package, go_column, id
   # Iterate and get genes for each parental based in its offspring GO
   l_offspring <- list(bp_offspring, mf_offspring, cc_offspring)
   l_offspring_keys <- unique(unlist(lapply(l_offspring, names)))
-  go_offspring <- setNames(do.call(mapply, c(FUN=c, lapply(l_offspring, `[`, l_offspring_keys))), l_offspring_keys)
+  go_offspring <- stats::setNames(do.call(mapply, c(FUN=c, lapply(l_offspring, `[`, l_offspring_keys))), l_offspring_keys)
 
   go_offspring_clean <- lapply(go_offspring, function(x) x[!is.na(x)])
 
@@ -261,18 +258,19 @@ create_gene_list_go <- function(go_vector = c("all"), org.package, go_column, id
   go_offspring_comp <- mapply(function(x, y) c(x,y), go_offspring_clean, names(go_offspring_clean))
 
   # Direct subset
-  go.list <- lapply(go_offspring_comp, function(x) subset(functional_data, functional_data[[go_column]] %in% x)[[id_column]])
+  go.list <- lapply(go_offspring_comp, function(x) subset(functional_data,
+                                                          functional_data[[go_column]] %in% x)[[id_column]])
   go.list <- lapply(go.list, unique)
 
   return(go.list)
 
 }
 
-
 #' Creation of input lists for KEGG pathways from an annotation package
 #'
 #' Function to create a list of genes associated with each KEGG pathway based on a
-#' species annotation package. It also allows filtering by species group.
+#' species annotation package with KO terms deribed from KEGGREST, KAAS or similar tools. It also allows
+#' filtering by species group.
 #'
 #' @param ko_vector KO vector to be included in the analysis, along with their pathways ancestors. "all" takes the complete set from the annotation package
 #' @param org.package Species annotation package
@@ -285,11 +283,15 @@ create_gene_list_go <- function(go_vector = c("all"), org.package, go_column, id
 #' @export
 #'
 #' @examples
+#' library("org.Knitens.eg.db")
+#' create_gene_list_kegg(ko_vector = "K10666", org.package = "org.Knitens.eg.db",
+#' ko_column = "KO", id_column = "GID", ko_prefix = "map", species = "plants")
+#'
 create_gene_list_kegg <- function(ko_vector = c("all"), org.package, ko_column, id_column,
                                   ko_prefix = "map", species = "all")
 {
-  functional_data <- select(get(org.package),
-                            keys = keys(get(org.package),keytype=id_column),
+  functional_data <- AnnotationDbi::select(get(org.package),
+                            keys = AnnotationDbi::keys(get(org.package),keytype=id_column),
                             columns =  c(id_column, ko_column))
 
   if (length(ko_vector) == 1 & ko_vector[1] == "all")
@@ -362,7 +364,6 @@ create_gene_list_kegg <- function(ko_vector = c("all"), org.package, ko_column, 
 
 }
 
-
 #' Creation of phase table lists
 #'
 #' Function that takes a list of genes associated with specific biological processes (GO, KEGG) or gene sets
@@ -375,7 +376,15 @@ create_gene_list_kegg <- function(ko_vector = c("all"), org.package, ko_column, 
 #' @export
 #'
 #' @examples
-gene.list.to.phases <- function(gene.list, phase.table)
+#' library(org.Otauri.eg.db)
+#' data("circa_table_genescarab")
+#'
+#' total_phases_table_sd <- data.frame(names=rownames(circa_table_genescarab),
+#' phase=as.numeric(circa_table_genescarab[["sd.peak.time.hours"]]))
+#' go.list.test <- create_gene_list_go(go_vector = "GO:0005515",
+#' org.package = "org.Otauri.eg.db", go_column = "GO", id_column = "GID")
+#' gene_list_to_phases(go.list.test, total_phases_table_sd)
+gene_list_to_phases <- function(gene.list, phase.table)
 {
   circa_reduced <- lapply(gene.list, function(x) subset(phase.table, names %in% x))
   circa_reduced_clean <- circa_reduced[which(sapply(circa_reduced, nrow) != 0)]
@@ -398,10 +407,9 @@ gene.list.to.phases <- function(gene.list, phase.table)
 #' @param iter.rao Number of iterations for Rao test
 #' @param force.rao.th Significance level to execute Rao test if Rayleigh, Kuiper and HR p-values are higher
 #'
-#' @returns A table indicating number of phases used for computation (n); mean, rho, variance, first, second and third quantiles of the circular distribution in hours; and p-values for each of the four tests
-#' @export
-#'
-#' @examples
+#' @returns A table indicating number of phases used for computation (n); mean, rho, variance, first,
+#' second and third quantiles of the circular distribution in hours; and p-values for each of the four
+#' tests
 #'
 create_circular_table <- function(circa_vector,hr.on.large.sets.th=400,
                                   iter.hr = 999, force.hr.th=0.05,
@@ -496,10 +504,10 @@ create_circular_table <- function(circa_vector,hr.on.large.sets.th=400,
 #' @param iter.kuiper Number of iterations for Kuiper test
 #' @param force.kuiper.th Significance level to execute Kuiper test if Rayleigh p-value is higher
 #'
-#' @returns A data.frame indicating number of phases used for computation (n); mean, rho, variance, first, second and third quantiles of the circular distribution in hours; and p-values for each of the four tests
-#' @export
+#' @returns A data.frame indicating number of phases used for computation (n); mean, rho,
+#' variance, first, second and third quantiles of the circular distribution in hours; and
+#'  p-values for each of the four tests
 #'
-#' @examples
 create_circular_table_grouped <- function(circa_vector, n_bins,
                                           hr.on.large.sets.th=400, iter.hr = 999, force.hr.th=0.05,
                                           rao.on.large.sets.th=400, iter.rao = 999, force.rao.th=0.05,
@@ -602,10 +610,10 @@ create_circular_table_grouped <- function(circa_vector, n_bins,
 #' Creation of the circular table and deviation from the uniform distribution for a phases list
 #'
 #' Function that takes a list of continuous phases associated with each process or gene set (output of the
-#' gene.list.to.phases function) and calculates the table of statistical measures and deviations from circular uniformity
+#' gene_list_to_phases function) and calculates the table of statistical measures and deviations from circular uniformity
 #' for each one using the Rayleigh, Kuiper, Hermans-Rasson, and Rao tests.
 #'
-#' @param phase.list Phases list in the same format as the output of gene.list.to.phases
+#' @param phase.list Phases list in the same format as the output of gene_list_to_phases
 #' @param hr.on.large.sets.th Threshold indicating the maximum size of a set to perform HR test on
 #' @param iter.hr Number of iterations for HR test
 #' @param force.hr.th Significance level to execute HR test if Rayleigh and Kuiper p-values are higher
@@ -617,6 +625,30 @@ create_circular_table_grouped <- function(circa_vector, n_bins,
 #' @export
 #'
 #' @examples
+#' library(org.Otauri.eg.db)
+#' data("circa_table_genescarab")
+#' total_phases_table_sd <- data.frame(names=rownames(circa_table_genescarab),
+#' phase=as.numeric(circa_table_genescarab[["sd.peak.time.hours"]]))
+#' functional_data <- select(org.Otauri.eg.db,
+#'                           keys = keys(org.Otauri.eg.db,keytype="GID"),
+#'                           columns =  c("GID", "GO"))
+#' complete_gos <- unique(functional_data$GO)
+#' complete_gos <- complete_gos[!is.na(complete_gos)]
+#'
+#' set.seed(2345)
+#' subset_gos <- complete_gos[sample(1:length(complete_gos), 50, replace = FALSE)]
+#' go.list.test <- create_gene_list_go(go_vector = subset_gos,
+#' org.package = "org.Otauri.eg.db",
+#' go_column = "GO", id_column = "GID")
+#' phases.list.sd <- gene_list_to_phases(go.list.test, total_phases_table_sd)
+#' phases.list.sd.clean <- phases.list.sd[which(sapply(phases.list.sd, nrow) != 0)][1:3]
+#' go.circa.table.sd <- complete_circular_table(phase.list = phases.list.sd.clean,
+#'                                              hr.on.large.sets.th = 200,
+#'                                              force.hr.th = 0.04,
+#'                                              rao.on.large.sets.th = 200,
+#'                                              force.rao.th = 0.04,
+#'                                              iter.rao = 999, iter.hr = 999)
+#'
 complete_circular_table <- function(phase.list, hr.on.large.sets.th=400,
                                     iter.hr = 999, force.hr.th=0.05,
                                     rao.on.large.sets.th=400,
@@ -633,13 +665,13 @@ complete_circular_table <- function(phase.list, hr.on.large.sets.th=400,
   # Adjust p-values due to multiple testing
   go_circa_num <- t(sapply(go_circa_res, function(x) unlist(x[1:7])))
   go_circa_kuiper <- sapply(go_circa_res, function(x) unlist(x[8]))
-  kuiper_bh <- p.adjust(go_circa_kuiper, method = "BH")
+  kuiper_bh <- stats::p.adjust(go_circa_kuiper, method = "BH")
   go_circa_ray <- sapply(go_circa_res, function(x) unlist(x[9]))
-  ray_bh <- p.adjust(go_circa_ray, method = "BH")
+  ray_bh <- stats::p.adjust(go_circa_ray, method = "BH")
   go_circa_hr <- sapply(go_circa_res, function(x) unlist(x[10]))
-  rh_bh <- p.adjust(go_circa_hr, method = "BH")
+  rh_bh <- stats::p.adjust(go_circa_hr, method = "BH")
   go_circa_rao <- sapply(go_circa_res, function(x) unlist(x[11]))
-  rao_bh <- p.adjust(go_circa_rao, method = "BH")
+  rao_bh <- stats::p.adjust(go_circa_rao, method = "BH")
 
   # Return updated table
   go_circa_table <- data.frame(go_circa_num, kuiper_p_value=go_circa_kuiper, kuiper_p_value_adj=kuiper_bh,
@@ -659,10 +691,10 @@ complete_circular_table <- function(phase.list, hr.on.large.sets.th=400,
 #' Creation of the circular table and deviation from the uniform distribution for a discrete (grouped) phases list
 #'
 #' Function that takes a list of discrete phases associated with each process or gene set (output of the
-#' gene.list.to.phases function) and calculates the table of statistical measures and deviations from circular uniformity
+#' gene_list_to_phases function) and calculates the table of statistical measures and deviations from circular uniformity
 #' for each one using the adapted Rayleigh, Kuiper, Hermans-Rasson, and Rao tests.
 #'
-#' @param phase.list Phases list in the same format as the output of gene.list.to.phases
+#' @param phase.list Phases list in the same format as the output of gene_list_to_phases
 #' @param n_bins Number of bins
 #' @param hr.on.large.sets.th Threshold indicating the maximum size of a set to perform HR test on
 #' @param iter.hr Number of iterations for HR test
@@ -678,6 +710,32 @@ complete_circular_table <- function(phase.list, hr.on.large.sets.th=400,
 #' @export
 #'
 #' @examples
+#' library(org.Otauri.eg.db)
+#' data("circa_table_genescarab")
+#' total_phases_table_sd <- data.frame(names=rownames(circa_table_genescarab),
+#' phase=as.numeric(circa_table_genescarab[["sd.peak.time.hours"]]))
+#' total_phases_table_sd_grouped <- data.frame(names=total_phases_table_sd$names,
+#' phase=trunc(total_phases_table_sd$phase))
+#'
+#' functional_data <- select(org.Otauri.eg.db,
+#'                           keys = keys(org.Otauri.eg.db,keytype="GID"),
+#'                           columns =  c("GID", "GO"))
+#' complete_gos <- unique(functional_data$GO)
+#' complete_gos <- complete_gos[!is.na(complete_gos)]
+#'
+#' set.seed(2345)
+#' subset_gos <- complete_gos[sample(1:length(complete_gos), 50, replace = FALSE)]
+#' go.list.test <- create_gene_list_go(go_vector = subset_gos,
+#' org.package = "org.Otauri.eg.db",
+#' go_column = "GO", id_column = "GID")
+#' phases.list.sd <- gene_list_to_phases(go.list.test, total_phases_table_sd_grouped)
+#' phases.list.sd.clean <- phases.list.sd[which(sapply(phases.list.sd, nrow) != 0)][1:3]
+#' go.circa.table.sd <- complete_circular_table_grouped(phase.list = phases.list.sd.clean,n_bins = 24,
+#'                                              hr.on.large.sets.th = 200,
+#'                                              force.hr.th = 0.04,
+#'                                              rao.on.large.sets.th = 200,
+#'                                              force.rao.th = 0.04,
+#'                                              iter.rao = 999, iter.hr = 999)
 complete_circular_table_grouped <- function(phase.list, n_bins,
                                             hr.on.large.sets.th=400, iter.hr = 999, force.hr.th=0.05,
                                             rao.on.large.sets.th=400, iter.rao = 999, force.rao.th=0.05,
@@ -697,13 +755,13 @@ complete_circular_table_grouped <- function(phase.list, n_bins,
   # Adjust p-values due to multiple testing
   go_circa_num <- t(sapply(go_circa_res, function(x) unlist(x[1:7])))
   go_circa_kuiper <- sapply(go_circa_res, function(x) unlist(x[8]))
-  kuiper_bh <- p.adjust(go_circa_kuiper, method = "BH")
+  kuiper_bh <- stats::p.adjust(go_circa_kuiper, method = "BH")
   go_circa_ray <- sapply(go_circa_res, function(x) unlist(x[9]))
-  ray_bh <- p.adjust(go_circa_ray, method = "BH")
+  ray_bh <- stats::p.adjust(go_circa_ray, method = "BH")
   go_circa_hr <- sapply(go_circa_res, function(x) unlist(x[10]))
-  rh_bh <- p.adjust(go_circa_hr, method = "BH")
+  rh_bh <- stats::p.adjust(go_circa_hr, method = "BH")
   go_circa_rao <- sapply(go_circa_res, function(x) unlist(x[11]))
-  rao_bh <- p.adjust(go_circa_rao, method = "BH")
+  rao_bh <- stats::p.adjust(go_circa_rao, method = "BH")
 
   # Return updated table
   go_circa_table <- data.frame(go_circa_num, kuiper_p_value=go_circa_kuiper, kuiper_p_value_adj=kuiper_bh,
@@ -725,13 +783,34 @@ complete_circular_table_grouped <- function(phase.list, n_bins,
 #' significantly from the overall phase distribution of the entire study. Significance is calculated
 #' based on a MANOVA analysis as described in https://doi.org/10.1186/s40462-022-00323-8.
 #'
-#' @param phase.list Phases list in the same format as the output of gene.list.to.phases
+#' @param phase.list Phases list in the same format as the output of gene_list_to_phases
 #' @param total.phase.table Table showing acrophases for the complete gene set under study, stated in hours
 #'
 #' @returns A data.frame with p-value and adjusted p-value (null hyphotesis: same distribution as the general one) for each process or gene set
 #' @export
 #'
 #' @examples
+#' library(org.Otauri.eg.db)
+#' data("circa_table_genescarab")
+#' total_phases_table_sd <- data.frame(names=rownames(circa_table_genescarab),
+#' phase=as.numeric(circa_table_genescarab[["sd.peak.time.hours"]]))
+#'
+#' functional_data <- select(org.Otauri.eg.db,
+#'                           keys = keys(org.Otauri.eg.db,keytype="GID"),
+#'                           columns =  c("GID", "GO"))
+#' complete_gos <- unique(functional_data$GO)
+#' complete_gos <- complete_gos[!is.na(complete_gos)]
+#'
+#' set.seed(2345)
+#' subset_gos <- complete_gos[sample(1:length(complete_gos), 50, replace = FALSE)]
+#' go.list.test <- create_gene_list_go(go_vector = subset_gos,
+#' org.package = "org.Otauri.eg.db",
+#' go_column = "GO", id_column = "GID")
+#' phases.list.sd <- gene_list_to_phases(go.list.test, total_phases_table_sd)
+#' phases.list.sd.clean <- phases.list.sd[which(sapply(phases.list.sd, nrow) != 0)][1:3]
+#' not_experimentally_distributed_gos <- test_against_gen_dist(phases.list.sd.clean,
+#' total_phases_table_sd)
+#'
 test_against_gen_dist <- function(phase.list, total.phase.table)
 {
   gen_dist <- total.phase.table$phase*pi/12
@@ -744,14 +823,14 @@ test_against_gen_dist <- function(phase.list, total.phase.table)
     angles <- c(gen_dist, x$phase * pi / 12)
 
     if (length(unique(x$phase)) == 1) {
-      angles <- angles + rnorm(length(angles), mean = 0, sd = 0.01)
+      angles <- angles + stats::rnorm(length(angles), mean = 0, sd = 0.01)
     }
 
-    p_values_gen_test <- summary(manova(cbind(sin(angles),cos(angles))
+    p_values_gen_test <- summary(stats::manova(cbind(sin(angles),cos(angles))
                                         ~ c(rep("general", len_gen_dist), rep("specific", nrow(x)))))$stats[1,6]
   })
 
-  gen_dist_bh <- p.adjust(p_values_gen_test, method = "BH")
+  gen_dist_bh <- stats::p.adjust(p_values_gen_test, method = "BH")
 
   gen_dist_table <- data.frame(gen_dist_p_value=p_values_gen_test,
                                gen_dist_p_value_adj=gen_dist_bh)
@@ -768,13 +847,41 @@ test_against_gen_dist <- function(phase.list, total.phase.table)
 #' Significance is calculated based on a MANOVA analysis as described in https://doi.org/10.1186/s40462-022-00323-8.
 #'
 #'
-#' @param phase.list.1 Phases list for condition 1, in the same format as the output of gene.list.to.phases
-#' @param phase.list.2 Phases list for condition 2, in the same format as the output of gene.list.to.phases
+#' @param phase.list.1 Phases list for condition 1, in the same format as the output of gene_list_to_phases
+#' @param phase.list.2 Phases list for condition 2, in the same format as the output of gene_list_to_phases
 #'
 #' @returns A data.frame with p-value and adjusted p-value (null hyphotesis: same distribution in both conditions) for each process or gene set
 #' @export
 #'
 #' @examples
+#' library(org.Otauri.eg.db)
+#' data("circa_table_genescarab")
+#' total_phases_table_sd <- data.frame(names=rownames(circa_table_genescarab),
+#' phase=as.numeric(circa_table_genescarab[["sd.peak.time.hours"]]))
+#' total_phases_table_ld <- data.frame(names=rownames(circa_table_genescarab),
+#' phase=as.numeric(circa_table_genescarab[["ld.peak.time.hours"]]))
+#'
+#' functional_data <- select(org.Otauri.eg.db,
+#'                           keys = keys(org.Otauri.eg.db,keytype="GID"),
+#'                           columns =  c("GID", "GO"))
+#' complete_gos <- unique(functional_data$GO)
+#' complete_gos <- complete_gos[!is.na(complete_gos)]
+#'
+#' set.seed(2345)
+#' subset_gos <- complete_gos[sample(1:length(complete_gos), 50, replace = FALSE)]
+#' go.list.test <- create_gene_list_go(go_vector = subset_gos,
+#' org.package = "org.Otauri.eg.db",
+#' go_column = "GO", id_column = "GID")
+#' phases.list.sd <- gene_list_to_phases(go.list.test, total_phases_table_sd)
+#' phases.list.sd.clean <- phases.list.sd[which(sapply(phases.list.sd, nrow) != 0)][1:3]
+#'
+#' phases.list.ld <- gene_list_to_phases(go.list.test, total_phases_table_sd)
+#' phases.list.ld.clean <- phases.list.sd[which(sapply(phases.list.sd, nrow) != 0
+#' )][names(phases.list.sd.clean)]
+#'
+#'
+#' diff_distributed_gos <- test_two_dist(phases.list.ld.clean, phases.list.sd.clean)
+#'
 test_two_dist <- function(phase.list.1, phase.list.2)
 {
   if (length(phase.list.1) != length(phase.list.2))
@@ -796,14 +903,14 @@ test_two_dist <- function(phase.list.1, phase.list.2)
     angles <- c(x$phase * pi / 12, y$phase * pi / 12)
 
     if (length(unique(x$phase)) == 1 | length(unique(y$phase)) == 1) {
-      angles <- angles + rnorm(length(angles), mean = 0, sd = 0.01)
+      angles <- angles + stats::rnorm(length(angles), mean = 0, sd = 0.01)
     }
 
-    p_values_gen_test <- summary(manova(cbind(sin(angles),cos(angles))
+    p_values_gen_test <- summary(stats::manova(cbind(sin(angles),cos(angles))
                                         ~ c(rep("first", nrow(x)), rep("second", nrow(y)))))$stats[1,6]
   }, phase.list.1, phase.list.2)
 
-  p_values_diff_bh <- p.adjust(unlist(p_values_diff_test), method = "BH")
+  p_values_diff_bh <- stats::p.adjust(unlist(p_values_diff_test), method = "BH")
 
   p_values_diff_table <- data.frame(p_value=unlist(p_values_diff_test),
                                     p_value_adj=p_values_diff_bh)
@@ -819,13 +926,43 @@ test_two_dist <- function(phase.list.1, phase.list.2)
 #' consisting on more than 100 genes, it takes a random sample of 100 gene phases to normalize
 #' and ensure noticiable changes.
 #'
-#' @param circa_result Table with circular distribution results, as the output from complete_circular_table or complete_circular_table_grouped
-#' @param phase_list Phases list in the same format as the output of gene.list.to.phases, containing the row names of circa_result as names of each element
+#' @param circa_result Table with circular distribution results, as the output from
+#' complete_circular_table or complete_circular_table_grouped
+#' @param phase_list Phases list in the same format as the output of gene_list_to_phases, containing the row names of circa_result as names of each element
 #'
 #' @returns A list whose elements are tables indicating the difference in circular mean and rho due to removing each gene for each process or gene set, and the rank of each difference
 #' @export
 #'
 #' @examples
+#' library(org.Otauri.eg.db)
+#' data("circa_table_genescarab")
+#' total_phases_table_sd <- data.frame(names=rownames(circa_table_genescarab),
+#' phase=as.numeric(circa_table_genescarab[["sd.peak.time.hours"]]))
+#'
+#' functional_data <- select(org.Otauri.eg.db,
+#'                           keys = keys(org.Otauri.eg.db,keytype="GID"),
+#'                           columns =  c("GID", "GO"))
+#' complete_gos <- unique(functional_data$GO)
+#' complete_gos <- complete_gos[!is.na(complete_gos)]
+#'
+#' set.seed(2345)
+#' subset_gos <- complete_gos[sample(1:length(complete_gos), 50, replace = FALSE)]
+#' go.list.test <- create_gene_list_go(go_vector = subset_gos,
+#' org.package = "org.Otauri.eg.db",
+#' go_column = "GO", id_column = "GID")
+#' phases.list.sd <- gene_list_to_phases(go.list.test, total_phases_table_sd)
+#' phases.list.sd.clean <- phases.list.sd[which(sapply(phases.list.sd, nrow) != 0)][1:3]
+#' go.circa.table.sd <- complete_circular_table(phase.list = phases.list.sd.clean,
+#'                                              hr.on.large.sets.th = 200,
+#'                                              force.hr.th = 0.04,
+#'                                              rao.on.large.sets.th = 200,
+#'                                              force.rao.th = 0.04,
+#'                                              iter.rao = 999, iter.hr = 999)
+#' gene_contributions <- gene_contribution_to_set(circa_result =
+#' go.circa.table.sd[1,],
+#' phase_list = phases.list.sd.clean[rownames(go.circa.table.sd)[1]])
+#'
+#'
 gene_contribution_to_set <- function(circa_result, phase_list)
 {
   phase_list <- phase_list[rownames(circa_result)]
@@ -835,7 +972,7 @@ gene_contribution_to_set <- function(circa_result, phase_list)
   {
     new_list <- lapply(1:nrow(phase_list[[x]]), function(y) phase_list[[x]][-y,])
     new_phases <- lapply(new_list, function(y) circular::circular(y$phase*pi/12))
-    new_phases <- lapply(new_phases, function(y) if(length(y) > 100) y[sample(1:length(y), size = 100, replace = F)] else y)
+    new_phases <- lapply(new_phases, function(y) if(length(y) > 100) y[sample(1:length(y), size = 100, replace = FALSE)] else y)
     new_summaries <- t(sapply(new_phases, function(y) summary(y)))[,c("Mean", "Rho")]
     rownames(new_summaries) <- phase_list[[x]]$names
     new_summaries[,"Mean"] <- new_summaries[,"Mean"]*12/pi
@@ -862,31 +999,59 @@ gene_contribution_to_set <- function(circa_result, phase_list)
 #' Function to determine the most likely number of modes in the presence of f-fold symmetry (1, 2 or 3),
 #' cluster genes in f clusters and determine the statistic summary for each cluster
 #'
-#' @param circa_table A phase table, as the individual elements of the list derived from gene.list.to.phases
+#' @param phase_table A phase table, as the individual elements of the list derived from gene_list_to_phases
 #'
 #' @returns A list containing the most likely mode number, the p-value for that number, the p-values corresponding to each mode number, the circular summary table for each cluster and the genes contained in each cluster
 #' @export
 #'
 #' @examples
-multimodal_analysis <- function(circa_table)
+#' library(org.Otauri.eg.db)
+#' data("circa_table_genescarab")
+#' total_phases_table_sd <- data.frame(names=rownames(circa_table_genescarab),
+#' phase=as.numeric(circa_table_genescarab[["sd.peak.time.hours"]]))
+#' functional_data <- select(org.Otauri.eg.db,
+#'                          keys = keys(org.Otauri.eg.db,keytype="GID"),
+#'                          columns =  c("GID", "GO"))
+#' complete_gos <- unique(functional_data$GO)
+#' complete_gos <- complete_gos[!is.na(complete_gos)]
+#' set.seed(2345)
+#' subset_gos <- complete_gos[sample(1:length(complete_gos), 50, replace = FALSE)]
+#' go.list.test <- create_gene_list_go(go_vector = subset_gos,
+#' org.package = "org.Otauri.eg.db",
+#' go_column = "GO", id_column = "GID")
+#' phases.list.sd <- gene_list_to_phases(go.list.test, total_phases_table_sd)
+#' phases.list.sd.clean <- phases.list.sd[which(sapply(phases.list.sd, nrow) != 0)]
+#' go.circa.table.sd <- complete_circular_table(phase.list = phases.list.sd.clean,
+#'                                             hr.on.large.sets.th = 200,
+#'                                             force.hr.th = 0.04,
+#'                                             rao.on.large.sets.th = 200,
+#'                                             force.rao.th = 0.04,
+#'                                             iter.rao = 999, iter.hr = 999)
+#' multi_table <- go.circa.table.sd[which(go.circa.table.sd$hr_p_value < 0.05 &
+#'                                          go.circa.table.sd$n > 2),]
+#' multi_go <- rownames(multi_table)[1]
+#' phase_table_multi_go <- phases.list.sd.clean[[multi_go]]
+#' multimodal_list <- multimodal_analysis(phase_table_multi_go)
+#'
+multimodal_analysis <- function(phase_table)
 {
-  circa_radians <- circular::circular(circa_table$phase*pi/12)
+  circa_radians <- circular::circular(phase_table$phase*pi/12)
   modes_summary <- summary(circa_radians)
   modes_ray <- circular::rayleigh.test(circa_radians, mu=circular::circular(modes_summary["Mean"]))$p.value
 
-  circa_radians_2 <- circular::circular(((circa_table$phase*2) %% 24)*pi/12)
+  circa_radians_2 <- circular::circular(((phase_table$phase*2) %% 24)*pi/12)
   modes_summary_2 <- summary(circa_radians_2)
   modes_ray_2 <- circular::rayleigh.test(circa_radians_2, mu=circular::circular(modes_summary_2["Mean"]))$p.value
 
-  circa_radians_3 <- circular::circular(((circa_table$phase*3) %% 24)*pi/12)
+  circa_radians_3 <- circular::circular(((phase_table$phase*3) %% 24)*pi/12)
   modes_summary_3 <- summary(circa_radians_3)
   modes_ray_3 <- circular::rayleigh.test(circa_radians_3, mu=circular::circular(modes_summary_3["Mean"]))$p.value
 
   expected_modes <- which.min(c(modes_ray, modes_ray_2, modes_ray_3))
   expected_p_value <- min(c(modes_ray, modes_ray_2, modes_ray_3))
 
-  result_FOCC <- OptCirClust::CirClust(circa_table$phase, expected_modes, 24, method = "FOCC")
-  clusters_focc <- lapply(1:max(result_FOCC$cluster), function(x) circa_table[result_FOCC$cluster == x,])
+  result_FOCC <- OptCirClust::CirClust(phase_table$phase, expected_modes, 24, method = "FOCC")
+  clusters_focc <- lapply(1:max(result_FOCC$cluster), function(x) phase_table[result_FOCC$cluster == x,])
   names(clusters_focc) <- paste0("cluster_", 1:max(result_FOCC$cluster))
 
   cluster_radians <- lapply(clusters_focc, function(x) circular::circular(x$phase*pi/12))
@@ -912,35 +1077,58 @@ multimodal_analysis <- function(circa_table)
 #' Function to plot a circular boxplot showing the circular distribution of
 #' different processes or gene sets
 #'
-#' @param res.table A circular results table, as the output from complete_circular_table or complete_circular_table_grouped
-#' @param filename PNG file name to export the plot
+#' @param res.table A circular results table, as the output from
+#' complete_circular_table or complete_circular_table_grouped
 #' @param color.palette Color palette to use. Available palettes are those from MetBrewer
 #' @param tr.height Height of each track. For more than 8 tracks, reduce this parameter
-#' @param width PNG file width in px
-#' @param height PNG file height in px
-#' @param res PNG file resolution
 #'
 #' @returns A PNG file containing the plot
 #' @export
 #'
 #' @examples
-circular_boxplot <- function(res.table, filename, color.palette = "Tam",
-                             tr.height = 0.1, width = 1600, height = 1600, res = 180)
+#' library(org.Otauri.eg.db)
+#' data("circa_table_genescarab")
+#' total_phases_table_sd <- data.frame(names=rownames(circa_table_genescarab),
+#' phase=as.numeric(circa_table_genescarab[["sd.peak.time.hours"]]))
+#'
+#' functional_data <- select(org.Otauri.eg.db,
+#'                           keys = keys(org.Otauri.eg.db,keytype="GID"),
+#'                           columns =  c("GID", "GO"))
+#' complete_gos <- unique(functional_data$GO)
+#' complete_gos <- complete_gos[!is.na(complete_gos)]
+#'
+#' set.seed(2345)
+#' subset_gos <- complete_gos[sample(1:length(complete_gos), 50, replace = FALSE)]
+#' go.list.test <- create_gene_list_go(go_vector = subset_gos,
+#' org.package = "org.Otauri.eg.db",
+#' go_column = "GO", id_column = "GID")
+#' phases.list.sd <- gene_list_to_phases(go.list.test, total_phases_table_sd)
+#' phases.list.sd.clean <- phases.list.sd[which(sapply(phases.list.sd, nrow) != 0)][1:3]
+#' go.circa.table.sd <- complete_circular_table(phase.list = phases.list.sd.clean,
+#'                                              hr.on.large.sets.th = 200,
+#'                                              force.hr.th = 0.04,
+#'                                              rao.on.large.sets.th = 200,
+#'                                              force.rao.th = 0.04,
+#'                                              iter.rao = 999, iter.hr = 999)
+#' circular_boxplot(go.circa.table.sd[1:2,], color.palette = "Tam")
+#'
+circular_boxplot <- function(res.table, color.palette = "Tam",
+                             tr.height = 0.1)
 {
-
-  grDevices::png(filename, width = width, height = height, res = res)
 
   sem <- sqrt(res.table$var)/sqrt(res.table$n)
   quan.table <- data.frame(go=rownames(res.table), res.table, min=res.table$first-sem, max=res.table$third+sem)
 
   # Create axis and initialize plot
-  circlize::circos.par("start.degree" = 90, cell.padding = c(0, 0, 0, 0), gap.degree=0, track.margin =c(0.005, 0.005))
+  circlize::circos.par("start.degree" = 90, cell.padding = c(0, 0, 0, 0),
+                       gap.degree=0, track.margin =c(0.005, 0.005),
+                       canvas.xlim = c(-1.2, 1.2), canvas.ylim = c(-1.1, 1.1))
   circlize::circos.initialize("a", xlim = c(0, 24)) # a means that there is a sector, which will go from 0 to 24
 
   circlize::circos.track(ylim = c(0, 1.5), track.height = 0.001,
                bg.col = NA, bg.border=NA, panel.fun = function(x, y) {
                  breaks = seq(0, 24, by = 4)
-                 circlize::circos.axis(h = "top", major.at = breaks, labels = paste0("ZT", breaks),
+                 circlize::circos.axis(h = "top", major.at = breaks, labels = as.character(breaks),
                              labels.cex = 1, lwd = 2)
                })
 
@@ -1070,12 +1258,11 @@ circular_boxplot <- function(res.table, filename, color.palette = "Tam",
   # Legend, establish values, lines, colors and the adjust position in the plot
   my_legend <- ComplexHeatmap::Legend(at = quan.table$go,
                       legend_gp = grid::gpar(fill = my_color), title_position = "topleft",
-                      title = "")
-  ComplexHeatmap::draw(my_legend, x = grid::unit(1, "npc") - grid::unit(2, "mm"), y = grid::unit(10, "mm"),
+                      title = "", labels_gp = grid::gpar(fontsize = 8))
+  ComplexHeatmap::draw(my_legend, x = grid::unit(1, "npc") - grid::unit(10, "mm"), y = grid::unit(10, "mm"),
        just = c("right", "bottom"))
 
   circlize::circos.clear()
-  grDevices::dev.off()
 }
 
 
@@ -1084,32 +1271,48 @@ circular_boxplot <- function(res.table, filename, color.palette = "Tam",
 #' Function to plot a circular dotplot showing the circular distribution of
 #' different processes or gene sets
 #'
-#' @param phases.list A named phase tables list in the same format as the output of gene.list.to.phases
-#' @param filename PNG file name to export the plot
+#' @param phases.list A named phase tables list in the same format as the output of gene_list_to_phases
 #' @param color.palette Color palette to use. Available palettes are those from MetBrewer
 #' @param tr.height Height of each track. For more than 8 tracks, reduce this parameter
-#' @param width PNG file width in px
-#' @param height PNG file height in px
-#' @param res PNG file resolution
 #'
 #' @returns A PNG file containing the plot
 #' @export
 #'
 #' @examples
-circular_dotplot <- function(phases.list, filename, color.palette = "Tam",
-                             tr.height = 0.1, width = 1600, height = 1600, res = 180)
+#' library(org.Otauri.eg.db)
+#' data("circa_table_genescarab")
+#' total_phases_table_sd <- data.frame(names=rownames(circa_table_genescarab),
+#' phase=as.numeric(circa_table_genescarab[["sd.peak.time.hours"]]))
+#'
+#' functional_data <- select(org.Otauri.eg.db,
+#'                           keys = keys(org.Otauri.eg.db,keytype="GID"),
+#'                           columns =  c("GID", "GO"))
+#' complete_gos <- unique(functional_data$GO)
+#' complete_gos <- complete_gos[!is.na(complete_gos)]
+#'
+#' set.seed(2345)
+#' subset_gos <- complete_gos[sample(1:length(complete_gos), 50, replace = FALSE)]
+#' go.list.test <- create_gene_list_go(go_vector = subset_gos,
+#' org.package = "org.Otauri.eg.db",
+#' go_column = "GO", id_column = "GID")
+#' phases.list.sd <- gene_list_to_phases(go.list.test, total_phases_table_sd)
+#' phases.list.sd.clean <- phases.list.sd[which(sapply(phases.list.sd, nrow) != 0)][1:3]
+#' circular_dotplot(phases.list.sd.clean, color.palette = "Tam")
+#'
+circular_dotplot <- function(phases.list, color.palette = "Tam",
+                             tr.height = 0.1)
 {
 
-  grDevices::png(filename, width = width, height = height, res = res)
-
   # Create axis and initialize plot
-  circlize::circos.par("start.degree" = 90, cell.padding = c(0, 0, 0, 0), gap.degree=0, track.margin =c(0.005, 0.005))
+  circlize::circos.par("start.degree" = 90, cell.padding = c(0, 0, 0, 0),
+                       gap.degree=0, track.margin =c(0.005, 0.005),
+                       canvas.xlim = c(-1.2, 1.2), canvas.ylim = c(-1.1, 1.1))
   circlize::circos.initialize("a", xlim = c(0, 24)) # a means that there is a sector, which will go from 0 to 24
 
   circlize::circos.track(ylim = c(0, 1.5), track.height = 0.001,
                bg.col = NA, bg.border=NA, panel.fun = function(x, y) {
                  breaks = seq(0, 24, by = 4)
-                 circlize::circos.axis(h = "top", major.at = breaks, labels = paste0("ZT", breaks),
+                 circlize::circos.axis(h = "top", major.at = breaks, labels = as.character(breaks),
                              labels.cex = 1, lwd = 2)
                })
 
@@ -1144,14 +1347,13 @@ circular_dotplot <- function(phases.list, filename, color.palette = "Tam",
   }
 
   # Legend, establish values, lines, colors and the adjust position in the plot
-  my_legend <- ComplexHeatmap::Legend(at = names(phases.list),
-                      legend_gp = grid::gpar(fill = my_color), title_position = "topleft",
-                      title = "")
-  ComplexHeatmap::draw(my_legend, x = grid::unit(1, "npc") - grid::unit(2, "mm"), y = grid::unit(10, "mm"),
-       just = c("right", "bottom"))
+  my_legend <- ComplexHeatmap::Legend(names(phases.list),
+                                      legend_gp = grid::gpar(fill = my_color), title_position = "topleft",
+                                      title = "", labels_gp = grid::gpar(fontsize = 8))
+  ComplexHeatmap::draw(my_legend, x = grid::unit(1, "npc") - grid::unit(10, "mm"), y = grid::unit(10, "mm"),
+                       just = c("right", "bottom"))
 
   circlize::circos.clear()
-  grDevices::dev.off()
 }
 
 
@@ -1161,37 +1363,52 @@ circular_dotplot <- function(phases.list, filename, color.palette = "Tam",
 #' Function to plot a circular histogram showing the circular distribution of
 #' different processes or gene sets
 #'
-#' @param phases.list A phase tables list in the same format as the output of gene.list.to.phases
-#' @param filename PNG file name to export the plot
+#' @param phases.list A phase tables list in the same format as the output of gene_list_to_phases
 #' @param color.palette Color palette to use. Available palettes are those from MetBrewer
 #' @param tr.height Height of each track. For more than 8 tracks, reduce this parameter
 #' @param nbins Number of bins (breaks) to split the histogram
-#' @param width PNG file width in px
-#' @param height PNG file height in px
-#' @param res PNG file resolution
 #'
 #' @returns A PNG file containing the plot
 #' @export
 #'
 #' @examples
-circular_histogram <- function(phases.list, filename,
+#' library(org.Otauri.eg.db)
+#' data("circa_table_genescarab")
+#' total_phases_table_sd <- data.frame(names=rownames(circa_table_genescarab),
+#' phase=as.numeric(circa_table_genescarab[["sd.peak.time.hours"]]))
+#'
+#' functional_data <- select(org.Otauri.eg.db,
+#'                           keys = keys(org.Otauri.eg.db,keytype="GID"),
+#'                           columns =  c("GID", "GO"))
+#' complete_gos <- unique(functional_data$GO)
+#' complete_gos <- complete_gos[!is.na(complete_gos)]
+#'
+#' set.seed(2345)
+#' subset_gos <- complete_gos[sample(1:length(complete_gos), 50, replace = FALSE)]
+#' go.list.test <- create_gene_list_go(go_vector = subset_gos,
+#' org.package = "org.Otauri.eg.db",
+#' go_column = "GO", id_column = "GID")
+#' phases.list.sd <- gene_list_to_phases(go.list.test, total_phases_table_sd)
+#' phases.list.sd.clean <- phases.list.sd[which(sapply(phases.list.sd, nrow) != 0)][1:3]
+#' circular_histogram(phases.list.sd.clean, color.palette = "Tam", nbins = 48)
+#'
+circular_histogram <- function(phases.list,
                                color.palette = "Tam", tr.height = 0.08,
-                               nbins = 24, width = 1600, height = 1600, res = 180)
+                               nbins = 24)
 {
 
   # Preparar fichero
-  grDevices::png(filename, width = width, height = height, res = res)
-
   circlize::circos.par(start.degree = 90,
              cell.padding = c(0, 0, 0, 0),
              gap.degree = 0,
-             track.margin = c(0.005, 0.005))
+             track.margin = c(0.005, 0.005),
+             canvas.xlim = c(-1.2, 1.2), canvas.ylim = c(-1.1, 1.1))
   circlize::circos.initialize(factors = "a", xlim = c(0, 24))
 
   circlize::circos.track(ylim = c(0, 1.5), track.height = 0.001, bg.col = NA, bg.border = NA,
                panel.fun = function(x, y) {
                  breaks = seq(0, 24, by = 4)
-                 circlize::circos.axis(h = "top", major.at = breaks, labels = paste0("ZT", breaks),
+                 circlize::circos.axis(h = "top", major.at = breaks, labels = as.character(breaks),
                              labels.cex = 1, lwd = 2)
                })
 
@@ -1201,7 +1418,7 @@ circular_histogram <- function(phases.list, filename,
   breaks_common <- seq(0, 24, length.out = nbins + 1)
 
   counts_list <- lapply(phases.list, function(x) {
-    h <- hist(x$phase, breaks = breaks_common, plot = FALSE, right = FALSE)
+    h <- graphics::hist(x$phase, breaks = breaks_common, plot = FALSE, right = FALSE)
     h$counts
   })
 
@@ -1226,14 +1443,13 @@ circular_histogram <- function(phases.list, filename,
                  })
   }
 
-  my_legend <- ComplexHeatmap::Legend(at = names(phases.list),
-                      legend_gp = grid::gpar(fill = my_color),
-                      title = "")
-  ComplexHeatmap::draw(my_legend, x = grid::unit(1, "npc") - grid::unit(2, "mm"),
-       y = grid::unit(10, "mm"), just = c("right", "bottom"))
+  my_legend <- ComplexHeatmap::Legend(names(phases.list),
+                                      legend_gp = grid::gpar(fill = my_color), title_position = "topleft",
+                                      title = "", labels_gp = grid::gpar(fontsize = 8))
+  ComplexHeatmap::draw(my_legend, x = grid::unit(1, "npc") - grid::unit(10, "mm"), y = grid::unit(10, "mm"),
+                       just = c("right", "bottom"))
 
   circlize::circos.clear()
-  grDevices::dev.off()
 
 }
 

@@ -30,7 +30,9 @@ create_circular_table(
 \item{force.rao.th}{Significance level to execute Rao test if Rayleigh, Kuiper and HR p-values are higher}
 }
 \value{
-A table indicating number of phases used for computation (n); mean, rho, variance, first, second and third quantiles of the circular distribution in hours; and p-values for each of the four tests
+A table indicating number of phases used for computation (n); mean, rho, variance, first,
+second and third quantiles of the circular distribution in hours; and p-values for each of the four
+tests
 }
 \description{
 Function that takes a vector of gene phases (continuous measurements or parametric estimates)

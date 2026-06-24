@@ -6,31 +6,19 @@
 \usage{
 circular_histogram(
   phases.list,
-  filename,
   color.palette = "Tam",
   tr.height = 0.08,
-  nbins = 24,
-  width = 1600,
-  height = 1600,
-  res = 180
+  nbins = 24
 )
 }
 \arguments{
-\item{phases.list}{A phase tables list in the same format as the output of gene.list.to.phases}
-
-\item{filename}{PNG file name to export the plot}
+\item{phases.list}{A phase tables list in the same format as the output of gene_list_to_phases}
 
 \item{color.palette}{Color palette to use. Available palettes are those from MetBrewer}
 
 \item{tr.height}{Height of each track. For more than 8 tracks, reduce this parameter}
 
 \item{nbins}{Number of bins (breaks) to split the histogram}
-
-\item{width}{PNG file width in px}
-
-\item{height}{PNG file height in px}
-
-\item{res}{PNG file resolution}
 }
 \value{
 A PNG file containing the plot
@@ -38,4 +26,26 @@ A PNG file containing the plot
 \description{
 Function to plot a circular histogram showing the circular distribution of
 different processes or gene sets
+}
+\examples{
+library(org.Otauri.eg.db)
+data("circa_table_genescarab")
+total_phases_table_sd <- data.frame(names=rownames(circa_table_genescarab),
+phase=as.numeric(circa_table_genescarab[["sd.peak.time.hours"]]))
+
+functional_data <- select(org.Otauri.eg.db,
+                          keys = keys(org.Otauri.eg.db,keytype="GID"),
+                          columns =  c("GID", "GO"))
+complete_gos <- unique(functional_data$GO)
+complete_gos <- complete_gos[!is.na(complete_gos)]
+
+set.seed(2345)
+subset_gos <- complete_gos[sample(1:length(complete_gos), 50, replace = FALSE)]
+go.list.test <- create_gene_list_go(go_vector = subset_gos,
+org.package = "org.Otauri.eg.db",
+go_column = "GO", id_column = "GID")
+phases.list.sd <- gene_list_to_phases(go.list.test, total_phases_table_sd)
+phases.list.sd.clean <- phases.list.sd[which(sapply(phases.list.sd, nrow) != 0)][1:3]
+circular_histogram(phases.list.sd.clean, color.palette = "Tam", nbins = 48)
+
 }

@@ -42,7 +42,9 @@ create_circular_table_grouped(
 \item{force.kuiper.th}{Significance level to execute Kuiper test if Rayleigh p-value is higher}
 }
 \value{
-A data.frame indicating number of phases used for computation (n); mean, rho, variance, first, second and third quantiles of the circular distribution in hours; and p-values for each of the four tests
+A data.frame indicating number of phases used for computation (n); mean, rho,
+variance, first, second and third quantiles of the circular distribution in hours; and
+p-values for each of the four tests
 }
 \description{
 Function that takes a vector of gene phases (discrete measurements or non-parametric estimates)

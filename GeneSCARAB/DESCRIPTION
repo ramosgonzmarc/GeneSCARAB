@@ -1,13 +1,12 @@
 Package: GeneSCARAB
 Title: Gene Set Circular Analysis for Rhythms Ascertainment in Bioprocesses
-Version: 0.1.0
+Version: 0.99.0
 Authors@R: 
-    person("Marcos", "Ramos-Gonzalez", email = "mramos5@us.es", role = c("aut", "cre"))
-Description: GeneSCARAB includes a range of features designed to enable a robust and comprehensive analysis of the circular distributions of biomolecules (genes, proteins, metabolites, ...) associated with bioprocesses in any species. It is specifically designed for circadian omics studies and facilitates data organization, statistical analysis, and the visualization of results.
+    person("Marcos", "Ramos-González", email = "mramos5@us.es", role = c("aut", "cre"))
+Description: GeneSCARAB includes a range of features designed to enable a robust and comprehensive analysis of the circular distributions of biomolecules (genes, proteins, metabolites, ...) associated with bioprocesses in any species. It is specifically designed for circadian omics studies and facilitates data organization, statistical analysis, and the visualization of results. It works with the output of standard rhythm detection software, such as CircaCompare, MetaCycle or RAIN.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.3
 Imports: 
     BiocGenerics,
     circlize,
@@ -16,11 +15,17 @@ Imports:
     ComplexHeatmap,
     Directional,
     GO.db,
-    grDevices,
     grid,
     KEGGREST,
     MetBrewer,
-    OptCirClust
+    OptCirClust,
+    AnnotationDbi
 Depends: 
     R (>= 3.5)
-LazyData: true
+LazyData: false
+Suggests: BiocStyle, knitr, rmarkdown, org.Otauri.eg.db, org.Knitens.eg.db
+VignetteBuilder: knitr
+Config/roxygen2/version: 8.0.0
+biocViews: Genetics, MultipleComparison, Proteomics, Software, SystemsBiology, TimeCourse, Transcriptomics, StatisticalMethod
+URL: https://github.com/ramosgonzmarc/GeneSCARAB
+BiocType: Software

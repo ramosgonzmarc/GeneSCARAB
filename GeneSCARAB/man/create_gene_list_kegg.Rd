@@ -31,5 +31,12 @@ A list linking each KEGG pathway with the genes that share that annotation
 }
 \description{
 Function to create a list of genes associated with each KEGG pathway based on a
-species annotation package. It also allows filtering by species group.
+species annotation package with KO terms deribed from KEGGREST, KAAS or similar tools. It also allows
+filtering by species group.
+}
+\examples{
+library("org.Knitens.eg.db")
+create_gene_list_kegg(ko_vector = "K10666", org.package = "org.Knitens.eg.db",
+ko_column = "KO", id_column = "GID", ko_prefix = "map", species = "plants")
+
 }

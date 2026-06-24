@@ -22,3 +22,9 @@ A list linking each GO term with the genes that share that annotation
 Function to create a list of genes associated with each GO term based on a
 species annotation package. This includes all ancestor GO terms of the selected ones.
 }
+\examples{
+library(org.Otauri.eg.db)
+go.list.test <- create_gene_list_go(go_vector = "GO:0005515",
+org.package = "org.Otauri.eg.db", go_column = "GO", id_column = "GID")
+
+}

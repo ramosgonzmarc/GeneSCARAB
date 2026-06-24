@@ -8,7 +8,7 @@
 Data frame
 }
 \usage{
-circa_table_genescarab
+data(circa_table_genescarab)
 }
 \description{
 Dataset example with phase information in two different conditions for Ostreococcus tauri
