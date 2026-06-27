@@ -45,5 +45,5 @@ Function that takes a vector of gene phases (continuous
 measurements or parametric estimates) and returns
 statistical measures of their circular distribution
 and their deviations from a circular uniform distribution
-based on the Rayleigh, Kuiper, Hermans-Rasson and Rao tests.
+based on the Rayleigh, Kuiper, Hermans-Rasson and Rao tests
 }

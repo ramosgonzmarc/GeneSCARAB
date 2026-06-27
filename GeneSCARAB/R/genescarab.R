@@ -264,6 +264,50 @@ KuiperPGroupedRad <- function(sample, m, iter = 9999) {
 }
 
 
+
+#' Extraction of all ancestors of a given GO terms vector
+#'
+#' Function to extract all ancestors of given GO terms
+#'
+#' @param go_vector GO terms vector to be included in the
+#' analysis, along with their ancestors. "all" takes the
+#' complete set from the annotation package
+#'
+#' @returns A vector containing ancestors of GO terms
+#'
+get_ancestor_for_gene_lists <- function(go_vector) {
+    # Get ancestors of selected GOs for BP, MF and CC
+    bp_ancestors <- BiocGenerics::mget(go_vector, GO.db::GOBPANCESTOR,
+        ifnotfound =
+            NA
+    )
+    mf_ancestors <- BiocGenerics::mget(go_vector, GO.db::GOMFANCESTOR,
+        ifnotfound =
+            NA
+    )
+    cc_ancestors <- BiocGenerics::mget(go_vector, GO.db::GOCCANCESTOR,
+        ifnotfound =
+            NA
+    )
+
+    l <- list(bp_ancestors, mf_ancestors, cc_ancestors)
+    l_keys <- unique(unlist(lapply(l, names)))
+
+    go_ancestors <- stats::setNames(
+        do.call(mapply, c(FUN = c, lapply(l, `[`, l_keys))), l_keys
+    )
+    go_ancestors <- lapply(go_ancestors, function(x) {
+        x[!is.na(x)]
+    })
+    go_ancestors <- lapply(go_ancestors, function(x) {
+        x[x != "all"]
+    })
+    go_vec_ancestors <- unlist(go_ancestors)
+    names(go_vec_ancestors) <- NULL
+    return(go_vec_ancestors)
+}
+
+
 #' Creation of input lists for GO terms from an annotation package
 #'
 #' Function to create a list of genes associated with each GO
@@ -296,99 +340,111 @@ create_gene_list_go <- function(go_vector = c("all"),
     functional_data <- AnnotationDbi::select(
         get(org.package),
         keys = AnnotationDbi::keys(get(org.package),
-            keytype =
-                id_column
-        ),
-        columns = c(id_column, go_column)
+            keytype = id_column
+        ), columns = c(id_column, go_column)
     )
     if (length(go_vector) == 1 & go_vector[1] == "all") {
         go_vector <- unique(functional_data[[go_column]])
         go_vector <- go_vector[!is.na(go_vector)]
     }
-
-
-    # Get ancestors of selected GOs for BP, MF and CC
-    bp_ancestors <- BiocGenerics::mget(go_vector, GO.db::GOBPANCESTOR,
-        ifnotfound =
-            NA
-    )
-    mf_ancestors <- BiocGenerics::mget(go_vector, GO.db::GOMFANCESTOR,
-        ifnotfound =
-            NA
-    )
-    cc_ancestors <- BiocGenerics::mget(go_vector, GO.db::GOCCANCESTOR,
-        ifnotfound =
-            NA
-    )
-
-    l <- list(bp_ancestors, mf_ancestors, cc_ancestors)
-    l_keys <- unique(unlist(lapply(l, names)))
-
-    go_ancestors <- stats::setNames(
-        do.call(mapply, c(FUN = c, lapply(l, `[`, l_keys))), l_keys
-    )
-    go_ancestors <- lapply(go_ancestors, function(x) {
-        x[!is.na(x)]
-    })
-    go_ancestors <- lapply(go_ancestors, function(x) {
-        x[x != "all"]
-    })
-    go_vec_ancestors <- unlist(go_ancestors)
-    names(go_vec_ancestors) <- NULL
-
+    go_vec_ancestors <- get_ancestor_for_gene_lists(go_vector)
     # Add go terms in study to the ancestors list to get successors
     query_vec_ancestors <- c(go_vec_ancestors, go_vector)
     query_vec_ancestors <- unique(query_vec_ancestors)
-
-    # Get succesors for the complete
-    # list of current GO terms and their ancestors
+    # Get succesors
     bp_offspring <- BiocGenerics::mget(
-        query_vec_ancestors, GO.db::GOBPOFFSPRING,
-        ifnotfound =
-            NA
+        query_vec_ancestors, GO.db::GOBPOFFSPRING, ifnotfound = NA
     )
     mf_offspring <- BiocGenerics::mget(
-        query_vec_ancestors, GO.db::GOMFOFFSPRING,
-        ifnotfound =
-            NA
+        query_vec_ancestors, GO.db::GOMFOFFSPRING, ifnotfound = NA
     )
     cc_offspring <- BiocGenerics::mget(
-        query_vec_ancestors, GO.db::GOCCOFFSPRING,
-        ifnotfound =
-            NA
+        query_vec_ancestors, GO.db::GOCCOFFSPRING, ifnotfound = NA
     )
-
     # Iterate and get genes for each parental based in its offspring GO
     l_offspring <- list(bp_offspring, mf_offspring, cc_offspring)
     l_offspring_keys <- unique(unlist(lapply(l_offspring, names)))
     go_offspring <- stats::setNames(do.call(mapply, c(
         FUN = c, lapply(l_offspring, `[`, l_offspring_keys)
     )), l_offspring_keys)
-
     go_offspring_clean <- lapply(go_offspring, function(x) {
         x[!is.na(x)]
     })
-
-    # Add self to each list
     go_offspring_comp <- mapply(
-        function(x, y) {
-            c(x, y)
-        },
-        go_offspring_clean,
-        names(go_offspring_clean)
+        function(x, y) { c(x, y) },
+        go_offspring_clean, names(go_offspring_clean)
     )
-
-    # Direct subset
     go.list <- lapply(go_offspring_comp, function(x) {
         subset(
-            functional_data,
-            functional_data[[go_column]] %in% x
+            functional_data, functional_data[[go_column]] %in% x
         )[[id_column]]
     })
     go.list <- lapply(go.list, unique)
 
     return(go.list)
 }
+
+
+#' Extraction of KEGG pathways from KO terms
+#'
+#' Function to extract KEGG pathways associated to a
+#' vector of KO terms and create a list containing this
+#' information
+#'
+#' @param ko_vector KO vector to extract pathways
+#' @param ko_prefix Prefix used to denote KEGG pathways, either
+#' "map" or "ko", depending on package version
+#'
+#' @returns A list of pathways associated to the KO
+#' terms input
+#'
+pathways_from_kos <- function(ko_vector, ko_prefix)
+{
+    {
+        if (length(ko_vector) < 500) {
+            present_pathways <- KEGGREST::keggLink(
+                "pathway", paste0(ko_vector, collapse = "+")
+            )
+        } else {
+            present_pathways <- KEGGREST::keggLink(
+                "pathway", paste0(ko_vector[seq_len(500)], collapse = "+")
+            )
+
+            for (i in 2:(length(ko_vector) %/% 500 + 1))
+            {
+                present_pathways <- append(
+                    present_pathways,
+                    KEGGREST::keggLink("pathway", paste0(ko_vector[(
+                        1 + (500 * (i - 1))):(i * 500)], collapse = "+"))
+                )
+            }
+        }
+    }
+    unique_pathways <- unique(unlist(present_pathways))
+    map_pathways <- unique_pathways[grep(ko_prefix, unique_pathways)]
+    list_pathways <- vapply(strsplit(map_pathways, ":"), function(x) {
+      x[[2]]
+    }, character(1))
+    {
+      if (length(list_pathways) < 500) {
+        kos_pathways <- KEGGREST::keggLink(
+          "ko", paste0(list_pathways, collapse = "+")
+        )
+      } else {
+        kos_pathways <- KEGGREST::keggLink(
+          "ko", paste0(list_pathways[seq_len(500)], collapse = "+")
+        )
+        for (i in 2:(length(list_pathways) %/% 500 + 1)) {
+          kos_pathways <- append(kos_pathways, KEGGREST::keggLink(
+            "ko", paste0(list_pathways[(1 +
+                                          (500 * (i - 1))):(i * 500)], collapse = "+")
+          ))
+        }
+      }
+    }
+    return(kos_pathways)
+}
+
 
 #' Creation of input lists for KEGG pathways from an annotation package
 #'
@@ -421,92 +477,31 @@ create_gene_list_go <- function(go_vector = c("all"),
 #'     species = "plants"
 #' )
 #'
-create_gene_list_kegg <- function(ko_vector = c("all"),
-                                  org.package,
-                                  ko_column,
-                                  id_column,
-                                  ko_prefix = "map",
+create_gene_list_kegg <- function(ko_vector = c("all"), org.package,
+                                  ko_column, id_column, ko_prefix = "map",
                                   species = "all") {
     functional_data <- AnnotationDbi::select(
         get(org.package),
         keys = AnnotationDbi::keys(get(org.package),
-            keytype =
-                id_column
-        ),
-        columns = c(id_column, ko_column)
+            keytype = id_column
+        ), columns = c(id_column, ko_column)
     )
-
     if (length(ko_vector) == 1 & ko_vector[1] == "all") {
         complete_kos <- unique(functional_data[[ko_column]])
         ko_vector <- complete_kos[!is.na(complete_kos)]
     }
-
-    # Get pathways for selected KOs
-    {
-        if (length(ko_vector) < 500) {
-            present_pathways <- KEGGREST::keggLink(
-                "pathway", paste0(ko_vector, collapse = "+")
-            )
-        } else {
-            present_pathways <- KEGGREST::keggLink(
-                "pathway", paste0(ko_vector[seq_len(500)], collapse = "+")
-            )
-
-            for (i in 2:(length(ko_vector) %/% 500 + 1))
-            {
-                present_pathways <- append(
-                    present_pathways,
-                    KEGGREST::keggLink("pathway", paste0(ko_vector[(1 +
-                        (500 * (i - 1))):(i * 500)], collapse = "+"))
-                )
-            }
-        }
-    }
-
-    unique_pathways <- unique(unlist(present_pathways))
-
-    map_pathways <- unique_pathways[grep(ko_prefix, unique_pathways)]
-    list_pathways <- vapply(strsplit(map_pathways, ":"), function(x) {
-        x[[2]]
-    }, character(1))
-
-
-    {
-        if (length(list_pathways) < 500) {
-            kos_pathways <- KEGGREST::keggLink(
-                "ko", paste0(list_pathways, collapse = "+")
-            )
-        } else {
-            kos_pathways <- KEGGREST::keggLink(
-                "ko", paste0(list_pathways[seq_len(500)], collapse = "+")
-            )
-
-            for (i in 2:(length(list_pathways) %/% 500 + 1))
-            {
-                kos_pathways <- append(
-                    kos_pathways, KEGGREST::keggLink(
-                        "ko", paste0(list_pathways[(1 +
-                            (500 * (i - 1))):(i * 500)], collapse = "+")
-                    )
-                )
-            }
-        }
-    }
-
+    kos_pathways <- function(ko_vector, ko_prefix)
     kos_pathways <- tapply(
-        kos_pathways,
-        INDEX = names(kos_pathways),
+        kos_pathways, INDEX = names(kos_pathways),
         FUN = function(x) {
             unlist(x)
-        },
-        simplify = FALSE
+        }, simplify = FALSE
     )
     names(kos_pathways) <- vapply(strsplit(names(kos_pathways),
         split = "path:"
     ), function(x) {
         x[[2]]
     }, character(1))
-
     kos_pathways_clean <- lapply(kos_pathways, function(x) {
         unique(x)
     })
@@ -516,13 +511,9 @@ create_gene_list_kegg <- function(ko_vector = c("all"),
         }, character(1))
     })
     ko_list <- lapply(kos_pathways_clean, function(x) {
-        subset(
-            functional_data,
-            functional_data[[ko_column]] %in% x
-        )[[id_column]]
+        subset(functional_data, functional_data[[ko_column]] %in% x)[[id_column]]
     })
     ko_list <- lapply(ko_list, unique)
-
     {
         if (species == "all") {
             return(ko_list)
@@ -534,6 +525,7 @@ create_gene_list_kegg <- function(ko_vector = c("all"),
         }
     }
 }
+
 
 #' Creation of phase table lists
 #'
@@ -571,9 +563,48 @@ gene_list_to_phases <- function(gene.list, phase.table) {
         subset(phase.table, names %in% x)
     })
     circa_reduced_clean <- circa_reduced[which(vapply(
-        circa_reduced, nrow, logical(1)
+        circa_reduced, nrow, numeric(1)
     ) != 0)]
     return(circa_reduced_clean)
+}
+
+
+#' Helper function to construct table from circular data
+#'
+#' Function that takes the calculated circular summary,
+#' variance and p-values of Rayleigh, Kuiper, HR and Rao's tests and
+#' construct the result table.
+#'
+#' @param circa_summary Process or gene sets list (as the output
+#' of create_gene_list_go and create_gene_list_kegg)
+#' @param circa_var Table showing acrophases for the
+#' complete gene set under study, stated in hours
+#' @param circa_kuiper P-value estimated by Kuiper test
+#' @param circa_ray P-value estimated by Rayleigh test
+#' @param circa_hr P-value estimated by HR test
+#' @param circa_rao P-value estimated by Rao test
+#'
+#' @returns A table indicating number of phases used for
+#' computation (n); mean, rho, variance, first,
+#' second and third quantiles of the circular distribution
+#' in hours; and p-values for each of the four tests
+#'
+table_builder <- function(circa_summary, circa_var, circa_kuiper,
+                          circa_ray, circa_hr, circa_rao) {
+    circa_table <- data.frame(
+        n = circa_summary["n"],
+        first = circa_summary["1st Qu."] * 12 / pi,
+        median = circa_summary["Median"] * 12 / pi,
+        mean = circa_summary["Mean"] * 12 / pi,
+        third = circa_summary["3rd Qu."] * 12 / pi,
+        rho = circa_summary["Rho"],
+        var = circa_var,
+        kuiper_p_value = circa_kuiper,
+        rayleigh_p_value = circa_ray,
+        hr_p_value = circa_hr,
+        rao_p_value = circa_rao
+    )
+    return(circa_table)
 }
 
 
@@ -584,7 +615,7 @@ gene_list_to_phases <- function(gene.list, phase.table) {
 #' measurements or parametric estimates) and returns
 #' statistical measures of their circular distribution
 #' and their deviations from a circular uniform distribution
-#' based on the Rayleigh, Kuiper, Hermans-Rasson and Rao tests.
+#' based on the Rayleigh, Kuiper, Hermans-Rasson and Rao tests
 #'
 #' @param circa_vector Phases vector
 #' @param hr.on.large.sets.th Threshold indicating the maximum size
@@ -603,34 +634,24 @@ gene_list_to_phases <- function(gene.list, phase.table) {
 #' second and third quantiles of the circular distribution
 #' in hours; and p-values for each of the four tests
 #'
-create_circular_table <- function(circa_vector,
-                                  hr.on.large.sets.th = 400,
-                                  iter.hr = 999,
-                                  force.hr.th = 0.05,
+create_circular_table <- function(circa_vector, hr.on.large.sets.th = 400,
+                                  iter.hr = 999, force.hr.th = 0.05,
                                   rao.on.large.sets.th = 400,
                                   iter.rao = 999,
                                   force.rao.th = 0.05) {
     circa_radians <- circular::circular(circa_vector * pi / 12)
-
     # Calculate circular measures
     circa_summary <- summary(circa_radians)
-
-    # Calculate circular variance and transform to hours again
     circa_var <- circular::var.circular(circa_radians)
-
-    # Apply kuiper's test
+    # Apply tests
     circa_kuiper <- Directional::kuiper(
         circa_radians,
         rads = TRUE, R = 1
     )$p.value
-
-    # Apply Rayleigh's test
     circa_ray <- circular::rayleigh.test(
         circa_radians,
         mu = circular::circular(circa_summary["Mean"])
     )$p.value
-
-    # Apply HR test
     if (iter.hr == 0) {
         circa_hr <- NA
     } else if (isTRUE(circa_kuiper <= force.hr.th |
@@ -641,37 +662,22 @@ create_circular_table <- function(circa_vector,
     } else {
         circa_hr <- CircMLE::HR_test(circa_radians,
             original = FALSE, iter = iter.hr
-        )
+        )[2]
     }
-
-    # Apply Rao test
     if (iter.rao == 0) {
         circa_rao <- NA
     } else if (isTRUE(circa_kuiper <= force.rao.th |
-        circa_ray <= force.rao.th | circa_hr[2] <= force.rao.th)) {
+        circa_ray <= force.rao.th | circa_hr <= force.rao.th)) {
         circa_rao <- NA
     } else if (isTRUE(length(circa_radians) >= rao.on.large.sets.th)) {
         circa_rao <- NA
     } else {
         circa_rao <- RaoTestUngroupedRad(circa_radians, iter = iter.rao)
     }
-
-    # Create table
-    circa_table <- data.frame(
-        n = circa_summary["n"],
-        first = circa_summary["1st Qu."] * 12 / pi,
-        median = circa_summary["Median"] * 12 / pi,
-        mean = circa_summary["Mean"] * 12 / pi,
-        third = circa_summary["3rd Qu."] * 12 / pi,
-        rho = circa_summary["Rho"],
-        var = circa_var,
-        kuiper_p_value = circa_kuiper,
-        rayleigh_p_value = circa_ray,
-        hr_p_value = circa_hr[2],
-        rao_p_value = circa_rao
+    circa_table <- table_builder(
+        circa_summary, circa_var, circa_kuiper,
+        circa_ray, circa_hr, circa_rao
     )
-
-
     return(circa_table)
 }
 
@@ -685,7 +691,6 @@ create_circular_table <- function(circa_vector,
 #' distribution and their deviations from a circular uniform
 #' distribution based on Rayleigh and adapted versions of
 #' Kuiper, Hermans-Rasson and Rao tests.
-#'
 #'
 #' @param circa_vector Discrete phases vector
 #' @param n_bins Number of bins
@@ -710,40 +715,25 @@ create_circular_table <- function(circa_vector,
 #' quartiles of the circular distribution in hours; and
 #'  p-values for each of the four tests
 #'
-create_circular_table_grouped <- function(circa_vector,
-                                          n_bins,
+create_circular_table_grouped <- function(circa_vector, n_bins,
                                           hr.on.large.sets.th = 400,
-                                          iter.hr = 999,
-                                          force.hr.th = 0.05,
+                                          iter.hr = 999, force.hr.th = 0.05,
                                           rao.on.large.sets.th = 400,
-                                          iter.rao = 999,
-                                          force.rao.th = 0.05,
+                                          iter.rao = 999, force.rao.th = 0.05,
                                           kuiper.on.large.sets.th = 400,
                                           iter.kuiper = 999,
                                           force.kuiper.th = 0.05) {
     circa_radians <- circular::circular(circa_vector * pi / 12)
-
-    # Calculate circular measures
     circa_summary <- summary(circa_radians)
-
-    # Calculate circular variance and transform to hours again
     circa_var <- circular::var.circular(circa_radians)
-
-    # Apply Rayleigh's test
     circa_ray <- circular::rayleigh.test(
-        circa_radians,
-        mu = circular::circular(circa_summary["Mean"])
+        circa_radians, mu = circular::circular(circa_summary["Mean"])
     )$p.value
-
     if (is.na(circa_ray)) {
         circa_ray <- 1
     }
-
-    # Apply Kuiper test
-    if (iter.kuiper == 0) {
-        circa_kuiper <- NA
-    } else if (isTRUE(circa_ray <= force.kuiper.th)) {
-        circa_kuiper <- NA
+    if (iter.kuiper == 0) { circa_kuiper <- NA
+    } else if (isTRUE(circa_ray <= force.kuiper.th)) { circa_kuiper <- NA
     } else if (isTRUE(length(circa_radians) >= kuiper.on.large.sets.th)) {
         circa_kuiper <- NA
     } else {
@@ -751,53 +741,28 @@ create_circular_table_grouped <- function(circa_vector,
             m = n_bins, iter = iter.kuiper
         )
     }
-
-    # Apply HR test
-    if (iter.hr == 0) {
-        circa_hr <- NA
+    if (iter.hr == 0) { circa_hr <- NA
     } else if (isTRUE(circa_ray <= force.hr.th |
-        circa_kuiper <= force.hr.th)) {
-        circa_hr <- NA
+        circa_kuiper <= force.hr.th)) { circa_hr <- NA
     } else if (isTRUE(length(circa_radians) >= hr.on.large.sets.th)) {
         circa_hr <- NA
-    } else {
-        circa_hr <- HermansRasson2PGroupedRad(circa_radians,
-            m = n_bins, iter =
-                iter.hr
+    } else { circa_hr <- HermansRasson2PGroupedRad(circa_radians,
+            m = n_bins, iter = iter.hr
         )
     }
-
-    # Apply Rao test
-    if (iter.rao == 0) {
-        circa_rao <- NA
+    if (iter.rao == 0) { circa_rao <- NA
     } else if (isTRUE(circa_kuiper <= force.rao.th |
         circa_ray <= force.rao.th | circa_hr <= force.rao.th)) {
         circa_rao <- NA
     } else if (isTRUE(length(circa_radians) >= rao.on.large.sets.th)) {
         circa_rao <- NA
-    } else {
-        circa_rao <- RaoPGroupedRad(
-            circa_radians,
-            m = n_bins, iter = iter.rao
+    } else { circa_rao <- RaoPGroupedRad(
+            circa_radians, m = n_bins, iter = iter.rao
         )
     }
-
-    # Create table
-    circa_table <- data.frame(
-        n = circa_summary["n"],
-        first = circa_summary["1st Qu."] * 12 / pi,
-        median = circa_summary["Median"] * 12 / pi,
-        mean = circa_summary["Mean"] * 12 / pi,
-        third = circa_summary["3rd Qu."] * 12 / pi,
-        rho = circa_summary["Rho"],
-        var = circa_var,
-        kuiper_p_value = circa_kuiper,
-        rayleigh_p_value = circa_ray,
-        hr_p_value = circa_hr,
-        rao_p_value = circa_rao
+    circa_table <- table_builder(
+        circa_summary, circa_var, circa_kuiper, circa_ray, circa_hr, circa_rao
     )
-
-
     return(circa_table)
 }
 
@@ -877,60 +842,40 @@ complete_circular_table <- function(phase.list,
                                     rao.on.large.sets.th = 400,
                                     iter.rao = 999,
                                     force.rao.th = 0.05) {
-    # Generate circular statistics table per GO
     go_circa_res <- lapply(phase.list, function(x) {
         create_circular_table(
-            x$phase,
-            hr.on.large.sets.th =
-                hr.on.large.sets.th,
-            iter.hr = iter.hr,
-            force.hr.th =
-                force.hr.th,
-            rao.on.large.sets.th =
-                rao.on.large.sets.th,
-            iter.rao = iter.rao,
-            force.rao.th =
-                force.rao.th
+            x$phase, hr.on.large.sets.th = hr.on.large.sets.th,
+            iter.hr = iter.hr, force.hr.th = force.hr.th,
+            rao.on.large.sets.th = rao.on.large.sets.th,
+            iter.rao = iter.rao, force.rao.th = force.rao.th
         )
     })
 
     # Adjust p-values due to multiple testing
     go_circa_num <- t(vapply(go_circa_res, function(x) {
-        unlist(x[seq_len(7)])
-    }, numeric(7)))
+        unlist(x[seq_len(7)]) }, numeric(7)))
     go_circa_kuiper <- vapply(go_circa_res, function(x) {
-        unlist(x[8])
-    }, numeric(1))
+        unlist(x[8]) }, numeric(1))
     kuiper_bh <- stats::p.adjust(go_circa_kuiper, method = "BH")
     go_circa_ray <- vapply(go_circa_res, function(x) {
-        unlist(x[9])
-    }, numeric(1))
+        unlist(x[9]) }, numeric(1))
     ray_bh <- stats::p.adjust(go_circa_ray, method = "BH")
     go_circa_hr <- vapply(go_circa_res, function(x) {
-        unlist(x[10])
-    }, numeric(1))
+        unlist(x[10]) }, numeric(1))
     rh_bh <- stats::p.adjust(go_circa_hr, method = "BH")
     go_circa_rao <- vapply(go_circa_res, function(x) {
-        unlist(x[11])
-    }, numeric(1))
+        unlist(x[11]) }, numeric(1))
     rao_bh <- stats::p.adjust(go_circa_rao, method = "BH")
-
     # Return updated table
     go_circa_table <- data.frame(
-        go_circa_num,
-        kuiper_p_value = go_circa_kuiper,
+        go_circa_num, kuiper_p_value = go_circa_kuiper,
         kuiper_p_value_adj = kuiper_bh,
         rayleigh_p_value = go_circa_ray,
         rayleigh_p_value_adj = ray_bh,
-        hr_p_value = go_circa_hr,
-        hr_p_value_adj = rh_bh,
-        rao_p_value = go_circa_rao,
-        rao_p_value_adj = rao_bh
+        hr_p_value = go_circa_hr, hr_p_value_adj = rh_bh,
+        rao_p_value = go_circa_rao, rao_p_value_adj = rao_bh
     )
     rownames(go_circa_table) <- names(phase.list)
-
-
-    # Transform negative means and quantiles to positive
     pos_res <- apply(go_circa_table[, 2:5], MARGIN = 2, function(x) {
         ifelse(as.numeric(x) < 0, 24 + as.numeric(x), as.numeric(x))
     })
@@ -1021,84 +966,55 @@ complete_circular_table <- function(phase.list,
 #'     force.rao.th = 0.04,
 #'     iter.rao = 999, iter.hr = 999
 #' )
-complete_circular_table_grouped <- function(phase.list,
-                                            n_bins,
+complete_circular_table_grouped <- function(phase.list, n_bins,
                                             hr.on.large.sets.th = 400,
-                                            iter.hr = 999,
-                                            force.hr.th = 0.05,
+                                            iter.hr = 999, force.hr.th = 0.05,
                                             rao.on.large.sets.th = 400,
-                                            iter.rao = 999,
-                                            force.rao.th = 0.05,
+                                            iter.rao = 999, force.rao.th = 0.05,
                                             kuiper.on.large.sets.th = 400,
                                             iter.kuiper = 999,
                                             force.kuiper.th = 0.05) {
-    # Generate circular statistics table per GO
     go_circa_res <- lapply(phase.list, function(x) {
         create_circular_table_grouped(
-            x$phase,
-            n_bins = n_bins,
-            hr.on.large.sets.th =
-                hr.on.large.sets.th,
-            iter.hr = iter.hr,
-            force.hr.th =
-                force.hr.th,
-            rao.on.large.sets.th =
-                rao.on.large.sets.th,
-            iter.rao = iter.rao,
-            force.rao.th =
-                force.rao.th,
-            kuiper.on.large.sets.th =
-                kuiper.on.large.sets.th,
-            iter.kuiper = iter.kuiper,
-            force.kuiper.th =
-                force.kuiper.th
+            x$phase, n_bins = n_bins,
+            hr.on.large.sets.th = hr.on.large.sets.th,
+            iter.hr = iter.hr, force.hr.th = force.hr.th,
+            rao.on.large.sets.th = rao.on.large.sets.th,
+            iter.rao = iter.rao, force.rao.th = force.rao.th,
+            kuiper.on.large.sets.th = kuiper.on.large.sets.th,
+            iter.kuiper = iter.kuiper, force.kuiper.th = force.kuiper.th
         )
     })
-
-    # Adjust p-values due to multiple testing
     go_circa_num <- t(vapply(go_circa_res, function(x) {
-        unlist(x[seq_len(7)])
-    }, numeric(7)))
+        unlist(x[seq_len(7)]) }, numeric(7)))
     go_circa_kuiper <- vapply(go_circa_res, function(x) {
-        unlist(x[8])
-    }, numeric(1))
+        unlist(x[8]) }, numeric(1))
     kuiper_bh <- stats::p.adjust(go_circa_kuiper, method = "BH")
     go_circa_ray <- vapply(go_circa_res, function(x) {
-        unlist(x[9])
-    }, numeric(1))
+        unlist(x[9]) }, numeric(1))
     ray_bh <- stats::p.adjust(go_circa_ray, method = "BH")
     go_circa_hr <- vapply(go_circa_res, function(x) {
-        unlist(x[10])
-    }, numeric(1))
+        unlist(x[10]) }, numeric(1))
     rh_bh <- stats::p.adjust(go_circa_hr, method = "BH")
     go_circa_rao <- vapply(go_circa_res, function(x) {
-        unlist(x[11])
-    }, numeric(1))
+        unlist(x[11]) }, numeric(1))
     rao_bh <- stats::p.adjust(go_circa_rao, method = "BH")
-
-    # Return updated table
     go_circa_table <- data.frame(
-        go_circa_num,
-        kuiper_p_value = go_circa_kuiper,
+        go_circa_num, kuiper_p_value = go_circa_kuiper,
         kuiper_p_value_adj = kuiper_bh,
         rayleigh_p_value = go_circa_ray,
         rayleigh_p_value_adj = ray_bh,
-        hr_p_value = go_circa_hr,
-        hr_p_value_adj = rh_bh,
-        rao_p_value = go_circa_rao,
-        rao_p_value_adj = rao_bh
+        hr_p_value = go_circa_hr, hr_p_value_adj = rh_bh,
+        rao_p_value = go_circa_rao, rao_p_value_adj = rao_bh
     )
     rownames(go_circa_table) <- names(phase.list)
-
-
-    # Transform negative means and quantiles to positive
     pos_res <- apply(go_circa_table[, 2:5], MARGIN = 2, function(x) {
         ifelse(as.numeric(x) < 0, 24 + as.numeric(x), as.numeric(x))
     })
     go_circa_table[, 2:5] <- pos_res
-
     return(go_circa_table)
 }
+
 
 #' Deviation from the total experimental distribution for a phases list
 #'
@@ -1174,8 +1090,8 @@ test_against_gen_dist <- function(phase.list, total.phase.table) {
             sin(angles),
             cos(angles)
         ) ~ c(
-          rep("general", len_gen_dist), rep("specific", nrow(x))
-            )))$stats[1, 6]
+            rep("general", len_gen_dist), rep("specific", nrow(x))
+        )))$stats[1, 6]
     }, numeric(1))
 
     gen_dist_bh <- stats::p.adjust(p_values_gen_test, method = "BH")
@@ -1306,6 +1222,7 @@ test_two_dist <- function(phase.list.1, phase.list.2) {
 }
 
 
+
 #' Contribution of each gene in a set to the temporal
 #' cohesion of the whole set
 #'
@@ -1395,17 +1312,13 @@ gene_contribution_to_set <- function(circa_result, phase_list) {
         })
         new_phases <- lapply(new_phases, function(y) {
             if (length(y) > 100) {
-                y[sample(seq_len(length(y)),
-                    size = 100,
-                    replace = FALSE
+                y[sample(seq_len(length(y)), size = 100, replace = FALSE
                 )]
-            } else {
-                y
-            }
+            } else { y }
         })
         new_summaries <- t(vapply(new_phases, function(y) {
             summary(y)
-        },numeric(8)))[, c("Mean", "Rho")]
+        }, numeric(8)))[, c("Mean", "Rho")]
         rownames(new_summaries) <- phase_list[[x]]$names
         new_summaries[, "Mean"] <- new_summaries[, "Mean"] * 12 / pi
         pos_res <- ifelse(
@@ -1416,33 +1329,68 @@ gene_contribution_to_set <- function(circa_result, phase_list) {
         new_summaries[, "Mean"] <- pos_res - circa_result[x, "mean"]
         new_summaries[, "Rho"] <- new_summaries[, "Rho"]
         -circa_result[x, "rho"]
-        # Rank impact
         new_summaries <- cbind(new_summaries,
-            Mean_rank = rank(-abs(
-                new_summaries[, "Mean"]
-            ))
+            Mean_rank = rank(-abs( new_summaries[, "Mean"]))
         )
         new_summaries <- cbind(new_summaries,
-            Rho_rank = rank(-abs(
-                new_summaries[, "Rho"]
-            ))
+            Rho_rank = rank(-abs(new_summaries[, "Rho"]))
         )
-
         res_lot[[x]] <- new_summaries
     }
-
     res_lot <- lapply(res_lot, function(x) {
         x[order(x[, "Mean_rank"]), ]
     })
     res_lot <- lapply(res_lot, function(x) {
-        colnames(x) <- c(
-            "Mean_diff", "Rho_diff",
-            "Mean_rank", "Rho_rank"
-        )
+        colnames(x) <- c("Mean_diff", "Rho_diff", "Mean_rank", "Rho_rank")
         x
     })
-
     return(res_lot)
+}
+
+
+
+#' Identification of different modes
+#'
+#' Function to determine the extract the Rayleigh p-value
+#' in the presence of f-fold symmetry (1, 2 or 3)
+#'
+#' @param phase_table A phase table, as the individual
+#' elements of the list derived from gene_list_to_phases
+#'
+#' @returns A vector containing the p-values for 1,2 and 3
+#' f-fold symmetry
+#'
+multimodal_modes_test <- function(phase_table) {
+    circa_radians <- circular::circular(phase_table$phase * pi / 12)
+    modes_summary <- summary(circa_radians)
+    modes_ray <- circular::rayleigh.test(
+        circa_radians,
+        mu = circular::circular(
+            modes_summary["Mean"]
+        )
+    )$p.value
+
+    circa_radians_2 <- circular::circular(((phase_table$phase * 2) %% 24) *
+        pi / 12)
+    modes_summary_2 <- summary(circa_radians_2)
+    modes_ray_2 <- circular::rayleigh.test(
+        circa_radians_2,
+        mu = circular::circular(
+            modes_summary_2["Mean"]
+        )
+    )$p.value
+
+    circa_radians_3 <- circular::circular(((phase_table$phase * 3) %% 24) *
+        pi / 12)
+    modes_summary_3 <- summary(circa_radians_3)
+    modes_ray_3 <- circular::rayleigh.test(
+        circa_radians_3,
+        mu = circular::circular(
+            modes_summary_3["Mean"]
+        )
+    )$p.value
+
+    return(c(modes_ray, modes_ray_2, modes_ray_3))
 }
 
 
@@ -1510,37 +1458,10 @@ gene_contribution_to_set <- function(circa_result, phase_list) {
 #' multimodal_list <- multimodal_analysis(phase_table_multi_go)
 #'
 multimodal_analysis <- function(phase_table) {
-    circa_radians <- circular::circular(phase_table$phase * pi / 12)
-    modes_summary <- summary(circa_radians)
-    modes_ray <- circular::rayleigh.test(
-        circa_radians,
-        mu = circular::circular(
-            modes_summary["Mean"]
-        )
-    )$p.value
+    modes.vector <- multimodal_modes_test(phase_table)
 
-    circa_radians_2 <- circular::circular(((phase_table$phase * 2) %% 24) *
-        pi / 12)
-    modes_summary_2 <- summary(circa_radians_2)
-    modes_ray_2 <- circular::rayleigh.test(
-        circa_radians_2,
-        mu = circular::circular(
-            modes_summary_2["Mean"]
-        )
-    )$p.value
-
-    circa_radians_3 <- circular::circular(((phase_table$phase * 3) %% 24) *
-        pi / 12)
-    modes_summary_3 <- summary(circa_radians_3)
-    modes_ray_3 <- circular::rayleigh.test(
-        circa_radians_3,
-        mu = circular::circular(
-            modes_summary_3["Mean"]
-        )
-    )$p.value
-
-    expected_modes <- which.min(c(modes_ray, modes_ray_2, modes_ray_3))
-    expected_p_value <- min(c(modes_ray, modes_ray_2, modes_ray_3))
+    expected_modes <- which.min(modes.vector)
+    expected_p_value <- min(modes.vector)
 
     result_FOCC <- OptCirClust::CirClust(
         phase_table$phase, expected_modes, 24,
@@ -1565,28 +1486,259 @@ multimodal_analysis <- function(phase_table) {
     cluster_table <- data.frame(
         n = cluster_summary["n", ],
         first = cluster_summary["1st Qu.", ] * 12 / pi,
-        median = cluster_summary["Median", ] * 12 /
-            pi,
+        median = cluster_summary["Median", ] * 12 / pi,
         mean = cluster_summary["Mean", ] * 12 / pi,
-        third = cluster_summary["3rd Qu.", ] * 12 /
-            pi,
-        rho = cluster_summary["Rho", ],
-        var = 1 - cluster_summary["Rho", ]
+        third = cluster_summary["3rd Qu.", ] * 12 / pi,
+        rho = cluster_summary["Rho", ], var = 1 - cluster_summary["Rho", ]
     )
-    pos_cluster <- apply(cluster_table[, 2:5], MARGIN = 2, function(x) {
-        ifelse(as.numeric(x) < 0, 24 + as.numeric(x), as.numeric(x))
-    })
+    pos_cluster <- apply(cluster_table[, 2:5],
+        MARGIN = 2, function(x) {
+            ifelse(as.numeric(x) < 0, 24 + as.numeric(x), as.numeric(x))
+        }
+    )
     cluster_table[, 2:5] <- pos_cluster
 
     cluster_list <- list(
-        expected_modes = expected_modes,
-        expected_p_value = expected_p_value,
-        total_p_values = c(modes_ray, modes_ray_2, modes_ray_3),
-        summary = cluster_table
+        expected_modes = expected_modes, expected_p_value = expected_p_value,
+        total_p_values = modes.vector, summary = cluster_table
     )
     cluster_list_res <- append(cluster_list, clusters_focc)
 
     return(cluster_list_res)
+}
+
+
+#' Helper circular grid creation
+#'
+#' Function to create axis and initialize plot
+#'
+#'
+#' @returns Axis
+
+helper_init_plot <- function() {
+    circlize::circos.par(
+        "start.degree" = 90,
+        cell.padding = c(0, 0, 0, 0),
+        gap.degree = 0,
+        track.margin = c(0.005, 0.005),
+        canvas.xlim = c(-1.2, 1.2),
+        canvas.ylim = c(-1.1, 1.1)
+    )
+    circlize::circos.initialize("a", xlim = c(0, 24))
+
+    circlize::circos.track(
+        ylim = c(0, 1.5),
+        track.height = 0.001,
+        bg.col = NA,
+        bg.border = NA,
+        panel.fun = function(x, y) {
+            breaks <- seq(0, 24, by = 4)
+            circlize::circos.axis(
+                h = "top",
+                major.at = breaks,
+                labels = as.character(breaks),
+                labels.cex = 1,
+                lwd = 2
+            )
+        }
+    )
+}
+
+
+#' Helper legend builder for boxplot
+#'
+#' Function to create tracks for boxplot
+#'
+#' @param quan.table A circular results table with sem info
+#' @param my_color Color vector to use
+#'
+#' @returns Legend of the plots
+legend_builder_boxplot <- function(quan.table, my_color) {
+    my_legend <- ComplexHeatmap::Legend(
+        at = quan.table$go,
+        legend_gp = grid::gpar(fill = my_color),
+        title_position = "topleft",
+        title = "",
+        labels_gp = grid::gpar(fontsize = 8)
+    )
+    ComplexHeatmap::draw(
+        my_legend,
+        x = grid::unit(1, "npc") - grid::unit(10, "mm"),
+        y = grid::unit(10, "mm"),
+        just = c("right", "bottom")
+    )
+}
+
+
+#' Helper track creation boxplot without cut
+#'
+#' Function to create tracks for boxplots that do not intersect
+#' the origin. If neither of the segments cut the sunrise,
+# there is nothing to unfold.
+#'
+#' @param tr.height Height of each track. For more than 8
+#' tracks, reduce this parameter
+#' @param quan.table A circular results table with sem info
+#' @param i Track counter
+#' @param my_color Color vector to use
+#'
+#' @returns Trac
+track_box_no_cut <- function(tr.height, quan.table, i, my_color) {
+    circlize::circos.track(
+        ylim = c(0, 1.5), track.height = tr.height,
+        bg.col = "#eaeded", bg.border = NA,
+        panel.fun = function(x, y) {
+            xlim <- circlize::CELL_META$xlim
+
+            circlize::circos.segments(
+                seq(0, 24, 4), 0, seq(0, 24, 4), 1.5,
+                col = "gray", lwd = 3, lty = 3
+            )
+
+            circlize::circos.segments(
+                quan.table[i, ]$min, 0.75,
+                quan.table[i, ]$max, 0.75,
+                col = my_color[i], lwd = 1.5
+            )
+
+            circlize::circos.rect(
+                quan.table[i, ]$first, 0.75 - 0.4,
+                quan.table[i, ]$third, 0.75 + 0.4,
+                col = my_color[i], border = my_color[i], lwd = 1.5
+            )
+
+            circlize::circos.segments(
+                c(quan.table[i, ]$min, quan.table[i, ]$max),
+                c(0.75 - 0.2, 0.75 - 0.2),
+                c(quan.table[i, ]$min, quan.table[i, ]$max),
+                c(0.75 + 0.2, 0.75 + 0.2),
+                col = my_color[i], lwd = 2
+            )
+            circlize::circos.segments(
+                quan.table[i, ]$median, 0.75 - 0.4,
+                quan.table[i, ]$median, 0.75 + 0.4,
+                col = "black", lwd = 2
+            )
+        }
+    )
+}
+
+
+#' Helper track creation boxplot for segments cutting the origin
+#'
+#' Function to create tracks for boxplots whose segments
+#' intersect the origin.
+#'
+#' @param tr.height Height of each track. For more than 8
+#' tracks, reduce this parameter
+#' @param quan.table A circular results table with sem info
+#' @param i Track counter
+#' @param my_color Color vector to use
+#'
+#' @returns Plotted track
+track_box_segments_cut <- function(tr.height, quan.table, i, my_color) {
+    circlize::circos.track(
+        ylim = c(0, 1.5), track.height = tr.height,
+        bg.col = "#eaeded", bg.border = NA,
+        panel.fun = function(x, y) {
+            xlim <- circlize::CELL_META$xlim
+            circlize::circos.segments(
+                seq(0, 24, 4), 0, seq(0, 24, 4), 1.5,
+                col = "gray", lwd = 3, lty = 3
+            )
+
+            circlize::circos.segments(quan.table[i, ]$min,
+                0.75, 24, 0.75,
+                col = my_color[i],
+                lwd = 1.5
+            )
+            circlize::circos.segments(0, 0.75, quan.table[i, ]$max,
+                0.75,
+                col = my_color[i],
+                lwd = 1.5
+            )
+
+            circlize::circos.rect(
+                quan.table[i, ]$first, 0.75 - 0.4,
+                quan.table[i, ]$third, 0.75 + 0.4,
+                col = my_color[i], border = my_color[i], lwd = 1.5
+            )
+
+            circlize::circos.segments(
+                c(quan.table[i, ]$min, quan.table[i, ]$max),
+                c(0.75 - 0.2, 0.75 - 0.2),
+                c(quan.table[i, ]$min, quan.table[i, ]$max),
+                c(0.75 + 0.2, 0.75 + 0.2),
+                col = my_color[i], lwd = 2
+            )
+            circlize::circos.segments(
+                quan.table[i, ]$median, 0.75 - 0.4,
+                quan.table[i, ]$median, 0.75 + 0.4,
+                col = "black", lwd = 2
+            )
+        }
+    )
+}
+
+
+#' Helper track creation boxplot for box cutting the origin
+#'
+#' Function to create tracks for boxplots whose boxes
+#' intersect the origin. In this case, the segment must
+#' be cut from min to 24 and from 0 to max. Also, the
+#' box must be unfolded from first to 24 and from 0 to third
+#' quartiles.
+#'
+#' @param tr.height Height of each track. For more than 8
+#' tracks, reduce this parameter
+#' @param quan.table A circular results table with sem info
+#' @param i Track counter
+#' @param my_color Color vector to use
+#'
+#' @returns Plotted track
+track_box_box_cut <- function(tr.height, quan.table, i, my_color) {
+    circlize::circos.track(
+        ylim = c(0, 1.5), track.height = tr.height,
+        bg.col = "#eaeded", bg.border = NA,
+        panel.fun = function(x, y) {
+            xlim <- circlize::CELL_META$xlim
+            circlize::circos.segments(
+                seq(0, 24, 4), 0, seq(0, 24, 4), 1.5,
+                col = "gray", lwd = 3, lty = 3
+            )
+
+            circlize::circos.segments(quan.table[i, ]$min,
+                0.75, 24, 0.75,
+                col = my_color[i], lwd = 1.5
+            )
+            circlize::circos.segments(0, 0.75, quan.table[i, ]$max,
+                0.75,
+                col = my_color[i], lwd = 1.5
+            )
+
+            circlize::circos.rect(
+                quan.table[i, ]$first, 0.75 - 0.4, 24, 0.75 + 0.4,
+                col = my_color[i], border = my_color[i], lwd = 1.5
+            )
+            circlize::circos.rect(
+                0, 0.75 - 0.4, quan.table[i, ]$third, 0.75 + 0.4,
+                col = my_color[i], border = my_color[i], lwd = 1.5
+            )
+
+            circlize::circos.segments(
+                c(quan.table[i, ]$min, quan.table[i, ]$max),
+                c(0.75 - 0.2, 0.75 - 0.2),
+                c(quan.table[i, ]$min, quan.table[i, ]$max),
+                c(0.75 + 0.2, 0.75 + 0.2),
+                col = my_color[i], lwd = 2
+            )
+            circlize::circos.segments(
+                quan.table[i, ]$median, 0.75 - 0.4,
+                quan.table[i, ]$median, 0.75 + 0.4,
+                col = "black", lwd = 2
+            )
+        }
+    )
 }
 
 
@@ -1656,49 +1808,14 @@ circular_boxplot <- function(res.table,
                              tr.height = 0.1) {
     sem <- sqrt(res.table$var) / sqrt(res.table$n)
     quan.table <- data.frame(
-        go = rownames(res.table),
-        res.table,
-        min = res.table$first - sem,
-        max = res.table$third + sem
+        go = rownames(res.table), res.table,
+        min = res.table$first - sem, max = res.table$third + sem
     )
 
-    # Create axis and initialize plot
-    circlize::circos.par(
-        "start.degree" = 90,
-        cell.padding = c(0, 0, 0, 0),
-        gap.degree = 0,
-        track.margin = c(0.005, 0.005),
-        canvas.xlim = c(-1.2, 1.2),
-        canvas.ylim = c(-1.1, 1.1)
-    )
-    circlize::circos.initialize("a", xlim = c(0, 24))
-
-    circlize::circos.track(
-        ylim = c(0, 1.5),
-        track.height = 0.001,
-        bg.col = NA,
-        bg.border = NA,
-        panel.fun = function(x, y) {
-            breaks <- seq(0, 24, by = 4)
-            circlize::circos.axis(
-                h = "top",
-                major.at = breaks,
-                labels = as.character(breaks),
-                labels.cex = 1,
-                lwd = 2
-            )
-        }
-    )
-
-
+    helper_init_plot()
     my_color <- MetBrewer::met.brewer(color.palette,
         n = nrow(quan.table)
     )
-
-    # Depending on the data, it may happen that the boxplot
-    # cuts the 24/0 threshold in its lower segment, in the box itself,
-    # in its upper segment or not at all, affecting the graph to be
-    # plotted. The for loop runs through all the sets analyzed
 
     for (i in seq_len(nrow(quan.table)))
     {{
@@ -1708,212 +1825,84 @@ circular_boxplot <- function(res.table,
             # If neither of the segments cut the sunrise,
             # there is nothing to unfold
             if (quan.table$min[i] < quan.table$max[i]) {
-                circlize::circos.track(
-                    ylim = c(0, 1.5),
-                    track.height = tr.height,
-                    bg.col = "#eaeded",
-                    bg.border = NA,
-                    panel.fun = function(x, y) {
-                        xlim <- circlize::CELL_META$xlim
-
-                        circlize::circos.segments(
-                            seq(0, 24, 4),
-                            0,
-                            seq(0, 24, 4),
-                            1.5,
-                            col = "gray",
-                            lwd = 3,
-                            lty = 3
-                        )
-
-                        circlize::circos.segments(
-                            quan.table[i, ]$min,
-                            0.75,
-                            quan.table[i, ]$max,
-                            0.75,
-                            col = my_color[i],
-                            lwd = 1.5
-                        )
-
-                        circlize::circos.rect(
-                            quan.table[i, ]$first,
-                            0.75 - 0.4,
-                            quan.table[i, ]$third,
-                            0.75 + 0.4,
-                            col = my_color[i],
-                            border = my_color[i],
-                            lwd = 1.5
-                        )
-
-                        circlize::circos.segments(
-                            c(quan.table[i, ]$min, quan.table[i, ]$max),
-                            c(0.75 - 0.2, 0.75 - 0.2),
-                            c(quan.table[i, ]$min, quan.table[i, ]$max),
-                            c(0.75 + 0.2, 0.75 + 0.2),
-                            col = my_color[i],
-                            lwd = 2
-                        )
-                        circlize::circos.segments(
-                            quan.table[i, ]$median,
-                            0.75 - 0.4,
-                            quan.table[i, ]$median,
-                            0.75 + 0.4,
-                            col = "black",
-                            lwd = 2
-                        )
-                    }
-                )
-            }
-            # If the lower or upper segment cut the dawn time,
-            # unfold the corresponding one
-            else if (quan.table$min[i] > quan.table$first[i] |
+                track_box_no_cut(tr.height, quan.table, i, my_color)
+            } else if (quan.table$min[i] > quan.table$first[i] |
                 quan.table$max[i] < quan.table$third[i]) {
-                circlize::circos.track(
-                    ylim = c(0, 1.5),
-                    track.height = tr.height,
-                    bg.col = "#eaeded",
-                    bg.border = NA,
-                    panel.fun = function(x, y) {
-                        xlim <- circlize::CELL_META$xlim
-
-                        circlize::circos.segments(
-                            seq(0, 24, 4),
-                            0,
-                            seq(0, 24, 4),
-                            1.5,
-                            col = "gray",
-                            lwd = 3,
-                            lty = 3
-                        )
-
-                        circlize::circos.segments(quan.table[i, ]$min,
-                            0.75,
-                            24,
-                            0.75,
-                            col = my_color[i],
-                            lwd = 1.5
-                        )
-                        circlize::circos.segments(0,
-                            0.75,
-                            quan.table[i, ]$max,
-                            0.75,
-                            col = my_color[i],
-                            lwd = 1.5
-                        )
-
-                        circlize::circos.rect(
-                            quan.table[i, ]$first,
-                            0.75 - 0.4,
-                            quan.table[i, ]$third,
-                            0.75 + 0.4,
-                            col = my_color[i],
-                            border = my_color[i],
-                            lwd = 1.5
-                        )
-
-                        circlize::circos.segments(
-                            c(quan.table[i, ]$min, quan.table[i, ]$max),
-                            c(0.75 - 0.2, 0.75 - 0.2),
-                            c(quan.table[i, ]$min, quan.table[i, ]$max),
-                            c(0.75 + 0.2, 0.75 + 0.2),
-                            col = my_color[i],
-                            lwd = 2
-                        )
-                        circlize::circos.segments(
-                            quan.table[i, ]$median,
-                            0.75 - 0.4,
-                            quan.table[i, ]$median,
-                            0.75 + 0.4,
-                            col = "black",
-                            lwd = 2
-                        )
-                    }
+                track_box_segments_cut(
+                    tr.height, quan.table, i,
+                    my_color
                 )
             }
         }
 
         # If the box cuts the dawn time
         else {
-            # In this case, the segment must be cut from min to
-            # 24 and from 0 to max. Also, the box must be unfolded
-            # from first to 24 and from 0 to third
-            circlize::circos.track(
-                ylim = c(0, 1.5),
-                track.height = tr.height,
-                bg.col = "#eaeded",
-                bg.border = NA,
-                panel.fun = function(x, y) {
-                    xlim <- circlize::CELL_META$xlim
-
-                    circlize::circos.segments(
-                        seq(0, 24, 4),
-                        0,
-                        seq(0, 24, 4),
-                        1.5,
-                        col = "gray",
-                        lwd = 3,
-                        lty = 3
-                    )
-
-                    circlize::circos.segments(quan.table[i, ]$min,
-                        0.75,
-                        24,
-                        0.75,
-                        col = my_color[i],
-                        lwd = 1.5
-                    )
-                    circlize::circos.segments(0,
-                        0.75,
-                        quan.table[i, ]$max,
-                        0.75,
-                        col = my_color[i],
-                        lwd = 1.5
-                    )
-
-                    circlize::circos.rect(
-                        quan.table[i, ]$first,
-                        0.75 - 0.4,
-                        24,
-                        0.75 + 0.4,
-                        col = my_color[i],
-                        border = my_color[i],
-                        lwd = 1.5
-                    )
-                    circlize::circos.rect(
-                        0,
-                        0.75 - 0.4,
-                        quan.table[i, ]$third,
-                        0.75 + 0.4,
-                        col = my_color[i],
-                        border = my_color[i],
-                        lwd = 1.5
-                    )
-
-                    circlize::circos.segments(
-                        c(quan.table[i, ]$min, quan.table[i, ]$max),
-                        c(0.75 - 0.2, 0.75 - 0.2),
-                        c(quan.table[i, ]$min, quan.table[i, ]$max),
-                        c(0.75 + 0.2, 0.75 + 0.2),
-                        col = my_color[i],
-                        lwd = 2
-                    )
-                    circlize::circos.segments(
-                        quan.table[i, ]$median,
-                        0.75 - 0.4,
-                        quan.table[i, ]$median,
-                        0.75 + 0.4,
-                        col = "black",
-                        lwd = 2
-                    )
-                }
-            )
+            track_box_box_cut(tr.height, quan.table, i, my_color)
         }
     }}
 
-    # Legend, establish values, lines, colors
-    # and the adjust position in the plot
+    legend_builder_boxplot(quan.table, my_color)
+
+    circlize::circos.clear()
+}
+
+
+#' Helper track creation dotplot
+#'
+#' Function to create tracks for dotplot
+#'
+#' @param tr.height Height of each track. For more than 8
+#' tracks, reduce this parameter
+#' @param phases.list A named phase tables list in the same
+#' format as the output of gene_list_to_phases
+#' @param i Track counter
+#' @param my_color Color vector to use
+#' @param my_transparent Transparent color vector to use
+#'
+#' @returns Axis
+track_dot <- function(tr.height, phases.list, i, my_color, my_transparent) {
+    circlize::circos.track(
+        ylim = c(0, 1.5),
+        track.height = tr.height,
+        bg.col = "#eaeded",
+        bg.border = NA,
+        panel.fun = function(x, y) {
+            xlim <- circlize::CELL_META$xlim
+
+            circlize::circos.segments(
+                seq(0, 24, 4),
+                0,
+                seq(0, 24, 4),
+                1.5,
+                col = "gray",
+                lwd = 3,
+                lty = 3
+            )
+
+            circlize::circos.points(
+                phases.list[[i]]$phase,
+                0.75,
+                col = my_color[i],
+                pch = 21,
+                bg = my_transparent[i]
+            )
+        }
+    )
+}
+
+
+#' Helper legend builder for dotplot and histogram
+#'
+#' Function to create tracks for dotplot
+#'
+#' @param phases.list A named phase tables list in the same
+#' format as the output of gene_list_to_phases
+#' @param my_color Color vector to use
+#'
+#' @returns Legend of the plots
+legend_builder <- function(phases.list, my_color) {
     my_legend <- ComplexHeatmap::Legend(
-        at = quan.table$go,
+        names(phases.list),
         legend_gp = grid::gpar(fill = my_color),
         title_position = "topleft",
         title = "",
@@ -1925,8 +1914,6 @@ circular_boxplot <- function(res.table,
         y = grid::unit(10, "mm"),
         just = c("right", "bottom")
     )
-
-    circlize::circos.clear()
 }
 
 
@@ -1983,34 +1970,7 @@ circular_boxplot <- function(res.table,
 circular_dotplot <- function(phases.list,
                              color.palette = "Tam",
                              tr.height = 0.1) {
-    # Create axis and initialize plot
-    circlize::circos.par(
-        "start.degree" = 90,
-        cell.padding = c(0, 0, 0, 0),
-        gap.degree = 0,
-        track.margin = c(0.005, 0.005),
-        canvas.xlim = c(-1.2, 1.2),
-        canvas.ylim = c(-1.1, 1.1)
-    )
-    circlize::circos.initialize("a", xlim = c(0, 24))
-
-    circlize::circos.track(
-        ylim = c(0, 1.5),
-        track.height = 0.001,
-        bg.col = NA,
-        bg.border = NA,
-        panel.fun = function(x, y) {
-            breaks <- seq(0, 24, by = 4)
-            circlize::circos.axis(
-                h = "top",
-                major.at = breaks,
-                labels = as.character(breaks),
-                labels.cex = 1,
-                lwd = 2
-            )
-        }
-    )
-
+    helper_init_plot()
 
     my_color <- MetBrewer::met.brewer(color.palette, n = length(phases.list))
     my_transparent <- vapply(my_color, function(x) {
@@ -2019,50 +1979,10 @@ circular_dotplot <- function(phases.list,
 
     for (i in seq_len(length(phases.list)))
     {
-        circlize::circos.track(
-            ylim = c(0, 1.5),
-            track.height = tr.height,
-            bg.col = "#eaeded",
-            bg.border = NA,
-            panel.fun = function(x, y) {
-                xlim <- circlize::CELL_META$xlim
-
-                circlize::circos.segments(
-                    seq(0, 24, 4),
-                    0,
-                    seq(0, 24, 4),
-                    1.5,
-                    col = "gray",
-                    lwd = 3,
-                    lty = 3
-                )
-
-                circlize::circos.points(
-                    phases.list[[i]]$phase,
-                    0.75,
-                    col = my_color[i],
-                    pch = 21,
-                    bg = my_transparent[i]
-                )
-            }
-        )
+        track_dot(tr.height, phases.list, i, my_color, my_transparent)
     }
 
-    # Legend, establish values, lines, colors
-    # and the adjust position in the plot
-    my_legend <- ComplexHeatmap::Legend(
-        names(phases.list),
-        legend_gp = grid::gpar(fill = my_color),
-        title_position = "topleft",
-        title = "",
-        labels_gp = grid::gpar(fontsize = 8)
-    )
-    ComplexHeatmap::draw(
-        my_legend,
-        x = grid::unit(1, "npc") - grid::unit(10, "mm"),
-        y = grid::unit(10, "mm"),
-        just = c("right", "bottom")
-    )
+    legend_builder(phases.list, my_color)
 
     circlize::circos.clear()
 }
@@ -2125,36 +2045,14 @@ circular_histogram <- function(phases.list,
                                color.palette = "Tam",
                                tr.height = 0.08,
                                nbins = 24) {
-    # Preparar fichero
-    circlize::circos.par(
-        start.degree = 90,
-        cell.padding = c(0, 0, 0, 0),
-        gap.degree = 0,
-        track.margin = c(0.005, 0.005),
-        canvas.xlim = c(-1.2, 1.2),
-        canvas.ylim = c(-1.1, 1.1)
-    )
-    circlize::circos.initialize(factors = "a", xlim = c(0, 24))
-    circlize::circos.track(
-        ylim = c(0, 1.5), track.height = 0.001, bg.col = NA, bg.border = NA,
-        panel.fun = function(x, y) {
-            breaks <- seq(0, 24, by = 4)
-            circlize::circos.axis(
-                h = "top", major.at = breaks, labels = as.character(breaks),
-                labels.cex = 1, lwd = 2
-            )
-        }
-    )
-
+    helper_init_plot()
     my_color <- MetBrewer::met.brewer(color.palette, n = length(phases.list))
     my_transparent <- vapply(
-        my_color,
-        function(x) circlize::add_transparency(x, 0.55),
+        my_color, function(x) circlize::add_transparency(x, 0.55),
         character(1)
     )
 
     breaks_common <- seq(0, 24, length.out = nbins + 1)
-
     counts_list <- lapply(phases.list, function(x) {
         h <- graphics::hist(x$phase,
             breaks = breaks_common,
@@ -2176,8 +2074,7 @@ circular_histogram <- function(phases.list,
                     ytop <- counts[b]
                     circlize::circos.rect(xleft, ybottom, xright, ytop,
                         sector.index = circlize::CELL_META$sector.index,
-                        col = my_color[i],
-                        border = my_color[i],
+                        col = my_color[i], border = my_color[i],
                         lwd = 0.3
                     )
                 }
@@ -2188,17 +2085,7 @@ circular_histogram <- function(phases.list,
             }
         )
     }
-
-    my_legend <- ComplexHeatmap::Legend(names(phases.list),
-        legend_gp = grid::gpar(fill = my_color), title_position = "topleft",
-        title = "", labels_gp = grid::gpar(fontsize = 8)
-    )
-    ComplexHeatmap::draw(my_legend,
-        x = grid::unit(1, "npc") - grid::unit(10, "mm"),
-        y = grid::unit(10, "mm"),
-        just = c("right", "bottom")
-    )
-
+    legend_builder(phases.list, my_color)
     circlize::circos.clear()
 }
 

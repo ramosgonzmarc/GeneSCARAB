@@ -80,11 +80,15 @@ library(GeneSCARAB)
 
 data("circa_table_genescarab")
 total_phases_table_ld <- data.frame(names = rownames(
-  circa_table_genescarab), phase = as.numeric(
-    circa_table_genescarab[["ld.peak.time.hours"]]))
+    circa_table_genescarab
+), phase = as.numeric(
+    circa_table_genescarab[["ld.peak.time.hours"]]
+))
 total_phases_table_sd <- data.frame(names = rownames(
-  circa_table_genescarab), phase = as.numeric(
-    circa_table_genescarab[["sd.peak.time.hours"]]))
+    circa_table_genescarab
+), phase = as.numeric(
+    circa_table_genescarab[["sd.peak.time.hours"]]
+))
 ```
 
 The basic pipeline implemented in GeneSCARAB consists of taking an 
@@ -108,7 +112,6 @@ a subset of GOs using the annotation package.
 
 ```{r gos_sel, echo=FALSE, message=FALSE}
 library(org.Otauri.eg.db)
-
 functional_data <- select(org.Otauri.eg.db,
     keys = keys(org.Otauri.eg.db, keytype = "GID"),
     columns = c("GID", "GO")
@@ -118,7 +121,9 @@ complete_gos <- complete_gos[!is.na(complete_gos)]
 
 set.seed(2345)
 subset_gos <- complete_gos[sample(
-  1:length(complete_gos), 50, replace = FALSE)]
+    1:length(complete_gos), 50,
+    replace = FALSE
+)]
 ```
 
 Then we generate a GO terms list with genes per GO term, including 
@@ -137,10 +142,13 @@ list of gene phases per GO for the short-day (SD) condition, and
 clean it by removing GOs with no associated rhythmic genes.
 
 ```{r phases_list, echo=FALSE, message=FALSE}
-phases.list.sd <- gene_list_to_phases(go.list.test, 
-                                      total_phases_table_sd)
+phases.list.sd <- gene_list_to_phases(
+    go.list.test,
+    total_phases_table_sd
+)
 phases.list.sd.clean <- phases.list.sd[which(
-  sapply(phases.list.sd, nrow) != 0)]
+    sapply(phases.list.sd, nrow) != 0
+)]
 ```
 
 Based on this list, the `complete_circular_table` function allows the
@@ -203,9 +211,10 @@ rao_boolean_sd <- go.circa.table.sd$rao_p_value < 0.05
 rao_boolean_sd[is.na(rao_boolean_sd)] <- FALSE
 
 sd_rhythmic <- rownames(go.circa.table.sd)[
-  go.circa.table.sd$rayleigh_p_value_adj < 0.05 |
-    go.circa.table.sd$kuiper_p_value_adj < 0.05 |
-    hr_boolean_sd | rao_boolean_sd]
+    go.circa.table.sd$rayleigh_p_value_adj < 0.05 |
+        go.circa.table.sd$kuiper_p_value_adj < 0.05 |
+        hr_boolean_sd | rao_boolean_sd
+]
 sd_rhythmic <- unique(sd_rhythmic[!is.na(sd_rhythmic)])
 length(sd_rhythmic)
 ```
@@ -253,7 +262,8 @@ modes and recalculates their associated circular statistics tables.
 
 ```{r multi_analysis}
 multi_table <- go.circa.table.sd[which(
-  go.circa.table.sd$hr_p_value < 0.05), ]
+    go.circa.table.sd$hr_p_value < 0.05
+), ]
 multi_go <- rownames(multi_table)[1]
 phase_table_multi_go <- phases.list.sd.clean[[multi_go]]
 multimodal_list <- multimodal_analysis(phase_table_multi_go)
@@ -309,7 +319,8 @@ of the custom gene sets.
 
 ```{r phases_custom}
 phases.list.custom <- gene_list_to_phases(
-  custom.list.test, total_phases_table_ld)
+    custom.list.test, total_phases_table_ld
+)
 ```
 
 ## Comparison of phase distributions of sets under two conditions
@@ -327,9 +338,11 @@ circular statistics table for LD condition.
 
 ```{r rhythmic_ld, warning=FALSE}
 phases.list.ld <- gene_list_to_phases(
-  go.list.test, total_phases_table_ld)
+    go.list.test, total_phases_table_ld
+)
 phases.list.ld.clean <- phases.list.ld[which(
-  sapply(phases.list.ld, nrow) != 0)]
+    sapply(phases.list.ld, nrow) != 0
+)]
 
 go.circa.table.ld <- complete_circular_table(
     phase.list = phases.list.ld.clean,
@@ -348,9 +361,10 @@ rao_boolean_ld <- go.circa.table.ld$rao_p_value < 0.05
 rao_boolean_ld[is.na(rao_boolean_ld)] <- FALSE
 
 ld_rhythmic <- rownames(go.circa.table.ld)[
-  go.circa.table.ld$rayleigh_p_value_adj < 0.05 |
-    go.circa.table.ld$kuiper_p_value_adj < 0.05 |
-    hr_boolean_ld | rao_boolean_ld]
+    go.circa.table.ld$rayleigh_p_value_adj < 0.05 |
+        go.circa.table.ld$kuiper_p_value_adj < 0.05 |
+        hr_boolean_ld | rao_boolean_ld
+]
 ld_rhythmic <- unique(ld_rhythmic[!is.na(ld_rhythmic)])
 length(ld_rhythmic)
 ```
@@ -366,7 +380,8 @@ on the result of MANOVA over the sines and cosines of the phases
 rhythmic_gos <- intersect(ld_rhythmic, sd_rhythmic)
 
 diff_distributed_gos <- test_two_dist(
-  phases.list.ld.clean[rhythmic_gos], phases.list.sd.clean[rhythmic_gos])
+    phases.list.ld.clean[rhythmic_gos], phases.list.sd.clean[rhythmic_gos]
+)
 sum(diff_distributed_gos$p_value_adj < 0.05)
 ```
 
@@ -395,7 +410,8 @@ in the set and of the entire set phases (Landler et al., 2021, 2022).
 
 ```{r diff_dist}
 not_experimentally_distributed_gos <- test_against_gen_dist(
-  phases.list.ld.clean[rhythmic_gos], total_phases_table_ld)
+    phases.list.ld.clean[rhythmic_gos], total_phases_table_ld
+)
 sum(not_experimentally_distributed_gos$gen_dist_p_value_adj < 0.05)
 ```
 
@@ -422,12 +438,17 @@ to the complete distribution.
 ranked_mean <- sapply(gene_contributions, function(x) rownames(x)[1])
 ranked_mean
 
-ranked_rho <- sapply(gene_contributions, function(x) names(
-  which.min(x[, "Rho_rank"])))
+ranked_rho <- sapply(gene_contributions, function(x) {
+    names(
+        which.min(x[, "Rho_rank"])
+    )
+})
 ranked_rho
 
-gene_of_interest_mean <- subset(phases.list.ld.clean$`GO:1902494`,
-                                names == ranked_mean[1])
+gene_of_interest_mean <- subset(
+    phases.list.ld.clean$`GO:1902494`,
+    names == ranked_mean[1]
+)
 circular_dotplot(
     phases.list = list(
         ranked_gene = gene_of_interest_mean,
